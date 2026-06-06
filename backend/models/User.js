@@ -25,6 +25,16 @@ const userSchema = new mongoose.Schema(
     isAvailable: {
       type: Boolean,
       default: false
+    },
+    location: {
+      lat: {
+        type: Number,
+        default: 0
+      },
+      lng: {
+        type: Number,
+        default: 0
+      }
     }
   },
   { timestamps: true }

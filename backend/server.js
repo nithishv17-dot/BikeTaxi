@@ -2,6 +2,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const http = require("http");
 const { Server } = require("socket.io");
+require("dotenv").config();
+const rideController = require("./controllers/rideController");
 const ridesRoutes = require("./routes/rideRoutes");
 const userRoutes = require("./routes/userRoutes");
 const driverRoutes = require("./routes/driverRoutes");
@@ -9,18 +11,15 @@ const cors = require("cors");
 
 const app = express();
 
-app.use("/api/drivers", driverRoutes);
-
-
 app.use(cors({
-  origin: true, // ⚠️ your flutter port (check it)
+  origin: true,
   credentials: true
 }));
 app.use(express.json());
 
 /* ---------------- DATABASE ---------------- */
 
-mongoose.connect("mongodb://127.0.0.1:27017/biketaxi")
+mongoose.connect(process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/biketaxi")
 .then(()=>{
     console.log("MongoDB Connected");
 })
@@ -44,30 +43,25 @@ const io = new Server(server, {
   }
 });
 
+app.set("io", io);
+
 app.use(express.json());
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
-
-  socket.on("requestRide", (data) => {
-    console.log("Ride requested:", data);
-
-    // broadcast to drivers
-    io.emit("newRideRequest", data);
-  });
-
-  socket.on("acceptRide", (data) => {
-    console.log("Ride accepted:", data);
-
-    // send update to user
-    io.emit("rideAccepted", data);
-  });
-
 });
+
+setInterval(async () => {
+  try {
+    await rideController.expireOpenNegotiations(io);
+  } catch (error) {
+    console.log("NEGOTIATION SWEEP ERROR:", error.message);
+  }
+}, 10000);
 
 /* ---------------- START SERVER ---------------- */
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 server.listen(PORT,()=>{
     console.log(`Server running on port ${PORT}`);

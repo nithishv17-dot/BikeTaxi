@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
+const jwt = require("jsonwebtoken");
+const authMiddleware = require("../middleware/authMiddleware");
 
 router.post("/register", async (req, res) => {
   try {
@@ -38,7 +40,7 @@ router.post("/register", async (req, res) => {
 
 router.post("/login", async (req, res) => {
   try {
-    const { phone, password } = req.body;
+    const { phone, password, role } = req.body;
 
     if (!phone || !password) {
       return res.status(400).json({
@@ -60,9 +62,22 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    if (role === "driver" && user.role !== "driver") {
+      return res.status(403).json({
+        message: "This account is not a driver account"
+      });
+    }
+
     return res.status(200).json({
       message: "Login successful",
-      userId: user._id
+      token: jwt.sign(
+        { id: user._id, role: user.role },
+        "secretkey",
+        { expiresIn: "7d" }
+      ),
+      userId: user._id,
+      role: user.role,
+      isAvailable: user.isAvailable || false
     });
   } catch (error) {
     console.log("LOGIN ERROR:", error);
@@ -73,5 +88,5 @@ router.post("/login", async (req, res) => {
 });
 const driverController = require("../controllers/driverController");
 
-router.post("/drivers-list", driverController.getDrivers);
+router.post("/drivers-list", authMiddleware, driverController.getDrivers);
 module.exports = router;
