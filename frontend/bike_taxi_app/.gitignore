@@ -15,7 +15,8 @@ migrate_working_dir/
 
 node_modules/
 .env
-build/
+build/*
+!build/web/
 .dart_tool/
 .packages
 .pub/
@@ -40,7 +41,8 @@ build/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
+/build/*
+!/build/web/
 /coverage/
 
 # Symbolication related
