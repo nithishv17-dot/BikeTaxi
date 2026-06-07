@@ -30664,7 +30664,7 @@ aQL(a,b,c){var s=null
 return c.a(A.b21(a,b,s,s,s,s))},
 f4(){var s=A.VR(),r=s.gkw(s)
 if(r==="localhost"||r==="127.0.0.1")return"http://localhost:5000/api"
-return"https://biketaxi-nithish.localtunnel.me/api"},
+return"https://biketaxi-nithish.loca.lt/api"},
 b4w(){var s,r,q=window.localStorage.getItem("biketaxi_token"),p=window.localStorage.getItem("biketaxi_userId"),o=window.localStorage.getItem("biketaxi_role")
 if(q!=null&&q.length!==0&&p!=null&&p.length!==0){s=o==null?"user":o
 r=t.N

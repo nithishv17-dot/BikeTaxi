@@ -13,14 +13,14 @@ class AppConfig {
       if (host == "localhost" || host == "127.0.0.1") {
         return "http://localhost:5000/api";
       }
-      return "https://biketaxi-nithish.localtunnel.me/api";
+      return "https://biketaxi-nithish.loca.lt/api";
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return "https://biketaxi-nithish.localtunnel.me/api";
+      return "https://biketaxi-nithish.loca.lt/api";
     }
 
-    return "https://biketaxi-nithish.localtunnel.me/api";
+    return "https://biketaxi-nithish.loca.lt/api";
   }
 
   static const String photonBaseUrl = String.fromEnvironment(
