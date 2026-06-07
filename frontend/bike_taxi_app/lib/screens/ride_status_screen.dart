@@ -31,6 +31,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   bool actionLoading = false;
   Timer? countdownTimer;
   int negotiationSecondsRemaining = 0;
+  String? overridePaymentMethod;
 
   bool get isNegotiationRide =>
       ride?["bookingMode"]?.toString() == "negotiation";
@@ -1234,7 +1235,8 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     final initialFare = ride?["initialFare"]?.toString() ?? "N/A";
     final offeredFare = ride?["offeredFare"]?.toString() ?? "N/A";
     final negotiationStatus = ride?["negotiationStatus"]?.toString() ?? "N/A";
-    final paymentMethod = ride?["paymentMethod"]?.toString() ?? "N/A";
+    final dbPaymentMethod = ride?["paymentMethod"]?.toString() ?? "N/A";
+    final paymentMethod = overridePaymentMethod ?? dbPaymentMethod;
     final paymentStatus = ride?["paymentStatus"]?.toString() ?? "N/A";
     final bookingMode = ride?["bookingMode"]?.toString() ?? "normal";
 
@@ -1442,38 +1444,26 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                 paymentStatus == "Pending") ...[
                               const SizedBox(height: 10),
                               if (widget.isDriver) ...[
-                                if (paymentMethod == "Cash") ...[
-                                  ElevatedButton(
-                                    onPressed: actionLoading ? null : payRide,
-                                    child: const Text("Confirm Cash Received"),
-                                  ),
-                                ] else if (paymentMethod == "UPI") ...[
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppPalette.secondary,
-                                          ),
-                                          onPressed: () => _showUPIQRCodeDialog(context, fare),
-                                          child: const Text("Generate QR Code"),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppPalette.secondary,
                                         ),
+                                        onPressed: () => _showUPIQRCodeDialog(context, fare),
+                                        child: const Text("Generate QR Code"),
                                       ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: ElevatedButton(
-                                          onPressed: actionLoading ? null : payRide,
-                                          child: const Text("Confirm Payment Done"),
-                                        ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: actionLoading ? null : payRide,
+                                        child: const Text("Cash Paid"),
                                       ),
-                                    ],
-                                  ),
-                                ] else ...[
-                                  ElevatedButton(
-                                    onPressed: actionLoading ? null : payRide,
-                                    child: const Text("Confirm Payment Received"),
-                                  ),
-                                ],
+                                    ),
+                                  ],
+                                ),
                               ] else ...[
                                 if (paymentMethod == "Cash") ...[
                                   Container(
@@ -1521,15 +1511,54 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                     onPressed: () => _showRiderUPISelector(context, fare),
                                     child: const Text("Pay Now (UPI)"),
                                   ),
+                                  const SizedBox(height: 10),
+                                  OutlinedButton(
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize: const Size(double.infinity, 54),
+                                      side: const BorderSide(color: AppPalette.primary),
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        overridePaymentMethod = "Cash";
+                                      });
+                                    },
+                                    child: const Text("Pay via Cash"),
+                                  ),
                                 ] else if (paymentMethod == "Card") ...[
                                   ElevatedButton(
                                     onPressed: () => _processRiderCardPayment(context),
                                     child: const Text("Pay Now (Card)"),
                                   ),
+                                  const SizedBox(height: 10),
+                                  OutlinedButton(
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize: const Size(double.infinity, 54),
+                                      side: const BorderSide(color: AppPalette.primary),
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        overridePaymentMethod = "Cash";
+                                      });
+                                    },
+                                    child: const Text("Pay via Cash"),
+                                  ),
                                 ] else ...[
                                   ElevatedButton(
                                     onPressed: actionLoading ? null : payRide,
                                     child: const Text("Pay Now"),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  OutlinedButton(
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize: const Size(double.infinity, 54),
+                                      side: const BorderSide(color: AppPalette.primary),
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        overridePaymentMethod = "Cash";
+                                      });
+                                    },
+                                    child: const Text("Pay via Cash"),
                                   ),
                                 ],
                               ],
