@@ -83,8 +83,9 @@ class ApiService {
   static Future<Map<String, dynamic>> register(
     String name,
     String phone,
-    String password,
-  ) async {
+    String password, {
+    String role = "user",
+  }) async {
     final response = await http.post(
       Uri.parse("$baseUrl/users/register"),
       headers: {
@@ -95,6 +96,7 @@ class ApiService {
         "name": name,
         "phone": phone,
         "password": password,
+        "role": role,
       }),
     );
 
@@ -370,6 +372,15 @@ class ApiService {
   static Future<Map<String, dynamic>> getUserRideHistory(String userId) async {
     final response = await http.get(
       Uri.parse("$baseUrl/rides/user/$userId/history"),
+      headers: _authHeaders(),
+    );
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getActiveRide() async {
+    final response = await http.get(
+      Uri.parse("$baseUrl/rides/active/current"),
       headers: _authHeaders(),
     );
 

@@ -20,6 +20,7 @@ router.post("/:id/confirm-offer", rideController.confirmRideOffer);
 router.post("/negotiate/:id", rideController.negotiateFare);
 router.post("/accept-offer/:id", rideController.acceptFare);
 router.post("/reject-offer/:id", rideController.rejectFare);
+router.get("/active/current", rideController.getActiveRide);
 router.get("/:id", rideController.getRide);
 
 module.exports = router;

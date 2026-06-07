@@ -8,7 +8,7 @@ router.post("/register", async (req, res) => {
   try {
     console.log("REGISTER BODY:", req.body);
 
-    const { name, phone, password } = req.body;
+    const { name, phone, password, role } = req.body;
 
     if (!name || !phone || !password) {
       return res.status(400).json({
@@ -24,7 +24,7 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    const user = new User({ name, phone, password });
+    const user = new User({ name, phone, password, role: role || "user" });
     await user.save();
 
     return res.status(201).json({

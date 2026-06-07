@@ -19,6 +19,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String message = "";
   bool isLoading = false;
   bool obscurePassword = true;
+  bool isDriver = false;
 
   void registerUser() async {
     if (nameController.text.trim().isEmpty ||
@@ -40,6 +41,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         nameController.text.trim(),
         phoneController.text.trim(),
         passwordController.text.trim(),
+        role: isDriver ? "driver" : "user",
       );
 
       print("REGISTER SUCCESS: $response");
@@ -153,6 +155,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 fontWeight: FontWeight.w600,
                                 height: 1.4,
                               ),
+                            ),
+                            const SizedBox(height: 20),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                ChoiceChip(
+                                  label: const Text("Rider"),
+                                  selected: !isDriver,
+                                  onSelected: (selected) {
+                                    setState(() {
+                                      isDriver = false;
+                                    });
+                                  },
+                                ),
+                                const SizedBox(width: 12),
+                                ChoiceChip(
+                                  label: const Text("Driver"),
+                                  selected: isDriver,
+                                  onSelected: (selected) {
+                                    setState(() {
+                                      isDriver = selected;
+                                    });
+                                  },
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 22),
                             TextField(

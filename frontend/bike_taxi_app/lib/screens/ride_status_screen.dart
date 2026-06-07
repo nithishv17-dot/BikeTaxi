@@ -7,6 +7,8 @@ import 'package:latlong2/latlong.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
 import '../theme/premium_ui.dart';
+import 'driver_screen.dart';
+import 'home_screen.dart';
 
 class RideStatusScreen extends StatefulWidget {
   final String rideId;
@@ -119,6 +121,37 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     });
 
     _syncCountdownFromRide();
+
+    if (nextRide != null) {
+      final status = nextRide["status"]?.toString();
+      final paymentStatus = nextRide["paymentStatus"]?.toString();
+
+      if ((status == "completed" && paymentStatus == "Paid") ||
+          status == "cancelled") {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (!mounted) return;
+          if (widget.isDriver) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DriverScreen(
+                  driverId: nextRide["driverId"]?.toString() ?? "",
+                ),
+              ),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(
+                  userId: nextRide["userId"]?.toString() ?? "",
+                ),
+              ),
+            );
+          }
+        });
+      }
+    }
   }
 
   String? _normalizeRideId(dynamic value) {
@@ -1384,23 +1417,46 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                             ),
                             const SizedBox(height: 16),
                              if (status == "accepted") ...[
-                                 if (widget.isDriver) ...[
-                                   TextField(
-                                     controller: otpController,
-                                     keyboardType: TextInputType.number,
-                                     maxLength: 4,
-                                     decoration: const InputDecoration(
-                                       labelText: "Enter Rider's 4-Digit OTP",
-                                       hintText: "4-Digit OTP code",
-                                       counterText: "",
-                                       prefixIcon: Icon(Icons.lock_open_rounded),
+                               if (widget.isDriver) ...[
+                                 TextField(
+                                   controller: otpController,
+                                   keyboardType: TextInputType.number,
+                                   maxLength: 4,
+                                   decoration: const InputDecoration(
+                                     labelText: "Enter Rider's 4-Digit OTP",
+                                     hintText: "4-Digit OTP code",
+                                     counterText: "",
+                                     prefixIcon: Icon(Icons.lock_open_rounded),
+                                   ),
+                                 ),
+                                 const SizedBox(height: 12),
+                                 Row(
+                                   children: [
+                                     Expanded(
+                                       flex: 3,
+                                       child: ElevatedButton(
+                                         style: ElevatedButton.styleFrom(
+                                           padding: const EdgeInsets.symmetric(vertical: 12),
+                                         ),
+                                         onPressed: actionLoading ? null : startRide,
+                                         child: const Text("Verify & Start"),
+                                       ),
                                      ),
-                                   ),
-                                   const SizedBox(height: 12),
-                                   ElevatedButton(
-                                     onPressed: actionLoading ? null : startRide,
-                                     child: const Text("Verify & Start Ride"),
-                                   ),
+                                     const SizedBox(width: 12),
+                                     Expanded(
+                                       flex: 2,
+                                       child: OutlinedButton(
+                                         style: OutlinedButton.styleFrom(
+                                           padding: const EdgeInsets.symmetric(vertical: 12),
+                                           foregroundColor: Colors.redAccent,
+                                           side: const BorderSide(color: Colors.redAccent),
+                                         ),
+                                         onPressed: actionLoading ? null : cancelRide,
+                                         child: const Text("Cancel"),
+                                       ),
+                                     ),
+                                   ],
+                                 ),
                                ] else ...[
                                  Container(
                                    padding: const EdgeInsets.all(12),
@@ -1425,21 +1481,67 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                      ],
                                    ),
                                  ),
+                                 const SizedBox(height: 12),
+                                 SizedBox(
+                                   width: double.infinity,
+                                   child: OutlinedButton(
+                                     style: OutlinedButton.styleFrom(
+                                       padding: const EdgeInsets.symmetric(vertical: 12),
+                                       foregroundColor: Colors.redAccent,
+                                       side: const BorderSide(color: Colors.redAccent),
+                                     ),
+                                     onPressed: actionLoading ? null : cancelRide,
+                                     child: const Text("Cancel Ride"),
+                                   ),
+                                 ),
                                ],
                                const SizedBox(height: 10),
                              ],
-                            if (status == "ongoing") ...[
-                              ElevatedButton(
-                                onPressed: actionLoading ? null : completeRide,
-                                child: const Text("Complete Ride"),
-                              ),
-                              const SizedBox(height: 10),
-                            ],
-                            if (status == "accepted" || status == "ongoing")
-                              ElevatedButton(
-                                onPressed: actionLoading ? null : cancelRide,
-                                child: const Text("Cancel Ride"),
-                              ),
+                             if (status == "ongoing") ...[
+                               Row(
+                                 children: [
+                                   if (widget.isDriver) ...[
+                                     Expanded(
+                                       flex: 3,
+                                       child: ElevatedButton(
+                                         style: ElevatedButton.styleFrom(
+                                           padding: const EdgeInsets.symmetric(vertical: 12),
+                                           backgroundColor: AppPalette.secondary,
+                                         ),
+                                         onPressed: actionLoading ? null : completeRide,
+                                         child: const Text("Complete Ride"),
+                                       ),
+                                     ),
+                                     const SizedBox(width: 12),
+                                     Expanded(
+                                       flex: 2,
+                                       child: OutlinedButton(
+                                         style: OutlinedButton.styleFrom(
+                                           padding: const EdgeInsets.symmetric(vertical: 12),
+                                           foregroundColor: Colors.redAccent,
+                                           side: const BorderSide(color: Colors.redAccent),
+                                         ),
+                                         onPressed: actionLoading ? null : cancelRide,
+                                         child: const Text("Cancel"),
+                                       ),
+                                     ),
+                                   ] else ...[
+                                     Expanded(
+                                       child: OutlinedButton(
+                                         style: OutlinedButton.styleFrom(
+                                           padding: const EdgeInsets.symmetric(vertical: 12),
+                                           foregroundColor: Colors.redAccent,
+                                           side: const BorderSide(color: Colors.redAccent),
+                                         ),
+                                         onPressed: actionLoading ? null : cancelRide,
+                                         child: const Text("Cancel Ride"),
+                                       ),
+                                     ),
+                                   ],
+                                 ],
+                               ),
+                               const SizedBox(height: 10),
+                             ],
                             if (status == "completed" &&
                                 paymentStatus == "Pending") ...[
                               const SizedBox(height: 10),

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/driver_screen.dart';
+import 'screens/ride_status_screen.dart';
 import 'services/api_service.dart';
 import 'services/session_service.dart';
 import 'services/socket_service.dart';
@@ -31,11 +32,7 @@ class BikeTaxiApp extends StatelessWidget {
       ApiService.token = session['token'];
       final role = session['role'] ?? 'user';
       final userId = session['userId']!;
-      if (role == 'driver') {
-        homeWidget = DriverScreen(driverId: userId);
-      } else {
-        homeWidget = HomeScreen(userId: userId);
-      }
+      homeWidget = SessionInitPage(userId: userId, role: role);
     } else {
       homeWidget = const LoginScreen();
     }
@@ -142,6 +139,80 @@ class BikeTaxiApp extends StatelessWidget {
         ),
       ),
       home: homeWidget,
+    );
+  }
+}
+
+class SessionInitPage extends StatefulWidget {
+  final String userId;
+  final String role;
+
+  const SessionInitPage({super.key, required this.userId, required this.role});
+
+  @override
+  State<SessionInitPage> createState() => _SessionInitPageState();
+}
+
+class _SessionInitPageState extends State<SessionInitPage> {
+  @override
+  void initState() {
+    super.initState();
+    _checkActiveRide();
+  }
+
+  Future<void> _checkActiveRide() async {
+    try {
+      final response = await ApiService.getActiveRide();
+      final activeRide = response["ride"] is Map ? response["ride"] : null;
+      if (!mounted) return;
+
+      if (activeRide != null) {
+        final rideId = activeRide["_id"]?.toString() ?? "";
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RideStatusScreen(
+              rideId: rideId,
+              isDriver: widget.role == "driver",
+            ),
+          ),
+        );
+      } else {
+        _goToHome();
+      }
+    } catch (e) {
+      print("Error checking active ride: $e");
+      _goToHome();
+    }
+  }
+
+  void _goToHome() {
+    if (!mounted) return;
+    if (widget.role == 'driver') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DriverScreen(driverId: widget.userId),
+        ),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HomeScreen(userId: widget.userId),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(
+          color: AppPalette.primary,
+        ),
+      ),
     );
   }
 }

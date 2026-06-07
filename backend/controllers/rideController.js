@@ -558,6 +558,11 @@ exports.payRide = async (req, res) => {
     ride.paymentStatus = "Paid";
     await ride.save();
 
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("rideCompleted", ride);
+    }
+
     return res.status(200).json({
       message: "Payment completed successfully",
       ride
@@ -876,4 +881,52 @@ exports.expireOpenNegotiations = async (io) => {
   });
 
   await Promise.all(rides.map((ride) => expireNegotiationIfNeeded(ride, io)));
+};
+
+exports.getActiveRide = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    // Find the latest active ride for the user (either rider or driver)
+    const ride = await Ride.findOne({
+      $or: [
+        { userId: userId },
+        { driverId: userId }
+      ],
+      status: { $in: ["requested", "accepted", "ongoing", "negotiating"] }
+    }).sort({ createdAt: -1 });
+
+    if (!ride) {
+      // Also check if there is a completed ride where payment is still pending
+      const pendingPaymentRide = await Ride.findOne({
+        $or: [
+          { userId: userId },
+          { driverId: userId }
+        ],
+        status: "completed",
+        paymentStatus: "Pending"
+      }).sort({ createdAt: -1 });
+
+      if (pendingPaymentRide) {
+        return res.status(200).json({
+          message: "Active ride found (Pending Payment)",
+          ride: pendingPaymentRide
+        });
+      }
+
+      return res.status(200).json({
+        message: "No active ride",
+        ride: null
+      });
+    }
+
+    return res.status(200).json({
+      message: "Active ride found",
+      ride
+    });
+  } catch (error) {
+    console.log("GET ACTIVE RIDE ERROR:", error);
+    return res.status(500).json({
+      message: error.message
+    });
+  }
 };
