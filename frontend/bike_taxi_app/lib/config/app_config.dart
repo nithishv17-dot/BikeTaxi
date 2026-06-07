@@ -9,14 +9,18 @@ class AppConfig {
     }
 
     if (kIsWeb) {
-      return "http://localhost:5000/api";
+      final host = Uri.base.host;
+      if (host == "localhost" || host == "127.0.0.1") {
+        return "http://localhost:5000/api";
+      }
+      return "http://10.159.120.37:5000/api";
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return "http://10.0.2.2:5000/api";
+      return "http://10.159.120.37:5000/api";
     }
 
-    return "http://localhost:5000/api";
+    return "http://10.159.120.37:5000/api";
   }
 
   static const String photonBaseUrl = String.fromEnvironment(

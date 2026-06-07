@@ -391,6 +391,334 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     }
   }
 
+  void _showUPIQRCodeDialog(BuildContext context, String fare) {
+    final String upiUrl = "upi://pay?pa=captain@upi&pn=Captain&am=$fare&cu=INR&tn=RidePayment";
+    final String qrImageUrl = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${Uri.encodeComponent(upiUrl)}";
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: ReflectionCard(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "UPI QR Code",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Fare: Rs. $fare",
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: AppPalette.primary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(12),
+                    child: Image.network(
+                      qrImageUrl,
+                      width: 200,
+                      height: 200,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return const SizedBox(
+                          width: 200,
+                          height: 200,
+                          child: Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 200,
+                          height: 200,
+                          color: Colors.grey.shade100,
+                          child: const Center(
+                            child: Icon(Icons.error_outline, color: Colors.red, size: 48),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "Ask the rider to scan this QR code to pay using Google Pay, PhonePe, Paytm, or BHIM.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Close"),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _processRiderUPIPayment(BuildContext context, String appName) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: ReflectionCard(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: CircularProgressIndicator(strokeWidth: 5),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "Connecting to $appName...",
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Please authorize the payment request on your phone.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+    Navigator.pop(context); // Close the processing dialog
+
+    await payRide();
+  }
+
+  void _showRiderUPISelector(BuildContext context, String fare) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(28),
+              topRight: Radius.circular(28),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Select UPI App",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Pay Rs. $fare using your preferred UPI app",
+                    style: const TextStyle(
+                      color: Colors.grey,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ListTile(
+                    leading: const Icon(Icons.phone_android_rounded, color: Colors.blue),
+                    title: const Text("Google Pay", style: TextStyle(fontWeight: FontWeight.bold)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _processRiderUPIPayment(context, "Google Pay");
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.account_balance_wallet_rounded, color: Colors.purple),
+                    title: const Text("PhonePe", style: TextStyle(fontWeight: FontWeight.bold)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _processRiderUPIPayment(context, "PhonePe");
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.payment_rounded, color: Colors.cyan),
+                    title: const Text("Paytm", style: TextStyle(fontWeight: FontWeight.bold)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _processRiderUPIPayment(context, "Paytm");
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.security_rounded, color: Colors.green),
+                    title: const Text("BHIM UPI", style: TextStyle(fontWeight: FontWeight.bold)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _processRiderUPIPayment(context, "BHIM UPI");
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _processRiderCardPayment(BuildContext context) async {
+    final cardNoController = TextEditingController();
+    final expiryController = TextEditingController();
+    final cvvController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: ReflectionCard(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Enter Card Details",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: cardNoController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: "Card Number",
+                        hintText: "1234 5678 1234 5678",
+                        prefixIcon: Icon(Icons.credit_card),
+                      ),
+                      validator: (v) => (v == null || v.length < 16) ? "Invalid Card" : null,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: expiryController,
+                            keyboardType: TextInputType.datetime,
+                            decoration: const InputDecoration(
+                              labelText: "Expiry (MM/YY)",
+                              hintText: "12/28",
+                            ),
+                            validator: (v) => (v == null || v.isEmpty) ? "Required" : null,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: cvvController,
+                            keyboardType: TextInputType.number,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: "CVV",
+                              hintText: "123",
+                            ),
+                            validator: (v) => (v == null || v.length < 3) ? "Invalid" : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () async {
+                        if (formKey.currentState?.validate() ?? false) {
+                          Navigator.pop(context); // Close details dialog
+                          
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => Dialog(
+                              backgroundColor: Colors.transparent,
+                              child: ReflectionCard(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    CircularProgressIndicator(),
+                                    SizedBox(height: 16),
+                                    Text("Processing card payment..."),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                          
+                          await Future.delayed(const Duration(seconds: 2));
+                          if (!mounted) return;
+                          Navigator.pop(context); // Close loading
+                          await payRide();
+                        }
+                      },
+                      child: const Text("Pay Now"),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> fetchOffers() async {
     try {
       final response = await ApiService.getRideOffers(widget.rideId);
@@ -1112,11 +1440,99 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                               ),
                             if (status == "completed" &&
                                 paymentStatus == "Pending") ...[
-                                const SizedBox(height: 10),
-                                ElevatedButton(
-                                  onPressed: actionLoading ? null : payRide,
-                                  child: const Text("Pay Now"),
-                                ),
+                              const SizedBox(height: 10),
+                              if (widget.isDriver) ...[
+                                if (paymentMethod == "Cash") ...[
+                                  ElevatedButton(
+                                    onPressed: actionLoading ? null : payRide,
+                                    child: const Text("Confirm Cash Received"),
+                                  ),
+                                ] else if (paymentMethod == "UPI") ...[
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppPalette.secondary,
+                                          ),
+                                          onPressed: () => _showUPIQRCodeDialog(context, fare),
+                                          child: const Text("Generate QR Code"),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed: actionLoading ? null : payRide,
+                                          child: const Text("Confirm Payment Done"),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ] else ...[
+                                  ElevatedButton(
+                                    onPressed: actionLoading ? null : payRide,
+                                    child: const Text("Confirm Payment Received"),
+                                  ),
+                                ],
+                              ] else ...[
+                                if (paymentMethod == "Cash") ...[
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEFF6FF),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: const Color(0xFF93C5FD)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.payments_rounded, color: AppPalette.primary, size: 28),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                "Please pay Captain Rs. $fare in Cash",
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 15,
+                                                  color: AppPalette.slate900,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              const Text(
+                                                "Waiting for Captain to confirm cash receipt...",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: AppPalette.slate600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ] else if (paymentMethod == "UPI") ...[
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppPalette.primary,
+                                    ),
+                                    onPressed: () => _showRiderUPISelector(context, fare),
+                                    child: const Text("Pay Now (UPI)"),
+                                  ),
+                                ] else if (paymentMethod == "Card") ...[
+                                  ElevatedButton(
+                                    onPressed: () => _processRiderCardPayment(context),
+                                    child: const Text("Pay Now (Card)"),
+                                  ),
+                                ] else ...[
+                                  ElevatedButton(
+                                    onPressed: actionLoading ? null : payRide,
+                                    child: const Text("Pay Now"),
+                                  ),
+                                ],
+                              ],
                             ],
                             const SizedBox(height: 10),
                             OutlinedButton(

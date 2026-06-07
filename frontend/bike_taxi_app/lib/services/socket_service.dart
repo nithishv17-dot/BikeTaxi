@@ -1,11 +1,17 @@
 import 'package:socket_io_client/socket_io_client.dart' as io_client;
+import '../config/app_config.dart';
 
 class SocketService {
   static late io_client.Socket socket;
 
   static void connect() {
+    final apiBase = AppConfig.apiBaseUrl;
+    final socketUrl = apiBase.endsWith("/api")
+        ? apiBase.substring(0, apiBase.length - 4)
+        : apiBase;
+
     socket = io_client.io(
-      "http://127.0.0.1:5000",
+      socketUrl,
       io_client.OptionBuilder()
           .setTransports(['websocket'])
           .disableAutoConnect()
