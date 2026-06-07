@@ -26,7 +26,10 @@ class RideModel {
   ) async {
     final response = await http.post(
       Uri.parse("${AppConfig.apiBaseUrl}/rides/request"),
-      headers: {"Content-Type": "application/json"},
+      headers: {
+        "Content-Type": "application/json",
+        "Bypass-Tunnel-Reminder": "true",
+      },
       body: jsonEncode({
         "pickup": pickup,
         "destination": destination,

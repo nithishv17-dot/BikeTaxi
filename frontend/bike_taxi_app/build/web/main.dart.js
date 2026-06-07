@@ -8873,7 +8873,7 @@ aED:function aED(a){this.a=a},
 aEx:function aEx(a){this.a=a},
 aEE:function aEE(a){this.a=a},
 aEw:function aEw(a){this.a=a},
-h0(){var s=t.N,r=A.a5(["Content-Type","application/json"],s,s)
+h0(){var s=t.N,r=A.a5(["Content-Type","application/json","Bypass-Tunnel-Reminder","true"],s,s)
 s=$.aKt
 if(s!=null&&s.length!==0)r.m(0,"Authorization","Bearer "+s)
 return r},
@@ -8881,7 +8881,7 @@ a6V(a,b,c){var s=0,r=A.L(t.P),q,p,o,n,m
 var $async$a6V=A.M(function(d,e){if(d===1)return A.I(e,r)
 for(;;)switch(s){case 0:p=A.cD(A.f4()+"/users/login",0,null)
 o=t.N
-n=A.a5(["Content-Type","application/json"],o,o)
+n=A.a5(["Content-Type","application/json","Bypass-Tunnel-Reminder","true"],o,o)
 m=A
 s=3
 return A.D(A.kQ(p,B.bc.nZ(A.a5(["phone",a,"password",b,"role",c],o,o),null),n),$async$a6V)
@@ -8928,7 +8928,7 @@ a6X(a,b,c){var s=0,r=A.L(t.P),q,p,o,n,m
 var $async$a6X=A.M(function(d,e){if(d===1)return A.I(e,r)
 for(;;)switch(s){case 0:p=A.cD(A.f4()+"/users/register",0,null)
 o=t.N
-n=A.a5(["Content-Type","application/json"],o,o)
+n=A.a5(["Content-Type","application/json","Bypass-Tunnel-Reminder","true"],o,o)
 m=A
 s=3
 return A.D(A.kQ(p,B.bc.nZ(A.a5(["name",a,"phone",b,"password",c],o,o),null),n),$async$a6X)

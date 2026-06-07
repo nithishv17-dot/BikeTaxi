@@ -11,6 +11,7 @@ class ApiService {
   static Map<String, String> _authHeaders() {
     final headers = <String, String>{
       "Content-Type": "application/json",
+      "Bypass-Tunnel-Reminder": "true",
     };
 
     if (token != null && token!.isNotEmpty) {
@@ -34,7 +35,10 @@ class ApiService {
   }) async {
     final response = await http.post(
       Uri.parse("$baseUrl/users/login"),
-      headers: {"Content-Type": "application/json"},
+      headers: {
+        "Content-Type": "application/json",
+        "Bypass-Tunnel-Reminder": "true",
+      },
       body: jsonEncode({
         "phone": phone,
         "password": password,
@@ -83,7 +87,10 @@ class ApiService {
   ) async {
     final response = await http.post(
       Uri.parse("$baseUrl/users/register"),
-      headers: {"Content-Type": "application/json"},
+      headers: {
+        "Content-Type": "application/json",
+        "Bypass-Tunnel-Reminder": "true",
+      },
       body: jsonEncode({
         "name": name,
         "phone": phone,
