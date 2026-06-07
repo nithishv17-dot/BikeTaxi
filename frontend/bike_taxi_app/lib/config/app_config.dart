@@ -13,14 +13,14 @@ class AppConfig {
       if (host == "localhost" || host == "127.0.0.1") {
         return "http://localhost:5000/api";
       }
-      return "http://10.159.120.37:5000/api";
+      return "https://biketaxi-nithish.localtunnel.me/api";
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return "http://10.159.120.37:5000/api";
+      return "https://biketaxi-nithish.localtunnel.me/api";
     }
 
-    return "http://10.159.120.37:5000/api";
+    return "https://biketaxi-nithish.localtunnel.me/api";
   }
 
   static const String photonBaseUrl = String.fromEnvironment(
