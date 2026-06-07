@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/session_service.dart';
 import '../theme/premium_ui.dart';
 import 'driver_screen.dart';
 import 'register_screen.dart';
@@ -51,6 +52,11 @@ class _LoginScreenState extends State<LoginScreen> {
           response["token"] != null &&
           response["userId"] != null) {
         ApiService.token = response["token"];
+        SessionService.saveSession(
+          response["token"],
+          response["userId"],
+          isDriver ? "driver" : "user",
+        );
         if (!mounted) return;
 
         if (isDriver) {

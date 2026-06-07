@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'screens/login_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/driver_screen.dart';
+import 'services/api_service.dart';
+import 'services/session_service.dart';
 import 'services/socket_service.dart';
 import 'theme/premium_ui.dart';
 
@@ -19,6 +23,22 @@ class BikeTaxiApp extends StatelessWidget {
     final baseTextTheme = GoogleFonts.poppinsTextTheme(
       ThemeData(brightness: Brightness.light).textTheme,
     );
+
+    // Check for saved session
+    final session = SessionService.loadSession();
+    Widget homeWidget;
+    if (session != null) {
+      ApiService.token = session['token'];
+      final role = session['role'] ?? 'user';
+      final userId = session['userId']!;
+      if (role == 'driver') {
+        homeWidget = DriverScreen(driverId: userId);
+      } else {
+        homeWidget = HomeScreen(userId: userId);
+      }
+    } else {
+      homeWidget = const LoginScreen();
+    }
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -121,7 +141,7 @@ class BikeTaxiApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const LoginScreen(),
+      home: homeWidget,
     );
   }
 }

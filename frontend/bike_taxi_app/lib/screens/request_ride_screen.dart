@@ -6,6 +6,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../services/api_service.dart';
+import '../services/location_service.dart';
 import '../theme/premium_ui.dart';
 import 'ride_status_screen.dart';
 
@@ -665,25 +666,57 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
 
   void _onMapTapped(LatLng point) {
     if (pickupLat == null || pickupLng == null) {
+      final label = "Map Tap (${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)})";
       setState(() {
         pickupLat = point.latitude;
         pickupLng = point.longitude;
-        pickupAddress = "Map Tap (${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)})";
-        pickupController.text = pickupAddress!;
+        pickupAddress = label;
+        pickupController.text = label;
+        pickupInput = label;
         pickupPlaceId = "map_tap_pickup";
         pickupError = null;
         message = "Pickup set from map tap";
       });
+      _reverseGeocodeAndUpdate(point.latitude, point.longitude, isPickup: true);
     } else {
+      final label = "Map Tap (${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)})";
       setState(() {
         dropLat = point.latitude;
         dropLng = point.longitude;
-        dropAddress = "Map Tap (${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)})";
-        destinationController.text = dropAddress!;
+        dropAddress = label;
+        destinationController.text = label;
+        dropInput = label;
         dropPlaceId = "map_tap_drop";
         dropError = null;
         message = "Drop set from map tap";
       });
+      _reverseGeocodeAndUpdate(point.latitude, point.longitude, isPickup: false);
+    }
+  }
+
+  Future<void> _reverseGeocodeAndUpdate(double lat, double lng, {required bool isPickup}) async {
+    try {
+      final results = await ApiService.searchPhotonPlaces(
+        "${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}",
+      );
+      if (!mounted || results.isEmpty) return;
+
+      final bestAddress = results.first["address"]?.toString();
+      if (bestAddress != null && bestAddress.isNotEmpty) {
+        setState(() {
+          if (isPickup) {
+            pickupAddress = bestAddress;
+            pickupController.text = bestAddress;
+            pickupInput = bestAddress;
+          } else {
+            dropAddress = bestAddress;
+            destinationController.text = bestAddress;
+            dropInput = bestAddress;
+          }
+        });
+      }
+    } catch (_) {
+      // Keep the coordinate-based label if reverse geocoding fails
     }
   }
 
@@ -933,10 +966,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                             ...[
                               {
                                 "name": "Current Location",
-                                "address": "MG Road Metro Station, Bangalore",
-                                "lat": 12.9756,
-                                "lng": 77.6067,
-                                "placeId": "current_loc_preset"
+                                "useGPS": true,
                               },
                               {
                                 "name": "Tech Park Gate 1",
@@ -948,16 +978,47 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                             ].map((preset) => Padding(
                               padding: const EdgeInsets.only(right: 6),
                               child: ActionChip(
-                                avatar: const Icon(Icons.my_location_rounded, size: 12, color: AppPalette.primary),
+                                avatar: Icon(
+                                  preset["useGPS"] == true
+                                      ? Icons.gps_fixed_rounded
+                                      : Icons.my_location_rounded,
+                                  size: 12,
+                                  color: AppPalette.primary,
+                                ),
                                 label: Text(preset["name"] as String, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                 padding: EdgeInsets.zero,
-                                onPressed: () {
-                                  _selectSuggestion({
-                                    "placeId": preset["placeId"],
-                                    "address": preset["address"],
-                                    "lat": preset["lat"],
-                                    "lng": preset["lng"],
-                                  }, isPickup: true);
+                                onPressed: () async {
+                                  if (preset["useGPS"] == true) {
+                                    setState(() {
+                                      message = "Getting your location...";
+                                    });
+                                    final pos = await LocationService.getCurrentPosition();
+                                    if (!mounted) return;
+                                    if (pos != null) {
+                                      final label = "My Location (${pos['lat']!.toStringAsFixed(5)}, ${pos['lng']!.toStringAsFixed(5)})";
+                                      _selectSuggestion({
+                                        "placeId": "gps_current_loc",
+                                        "address": label,
+                                        "lat": pos['lat'],
+                                        "lng": pos['lng'],
+                                      }, isPickup: true);
+                                      setState(() {
+                                        message = "Pickup set to your current location";
+                                      });
+                                      _reverseGeocodeAndUpdate(pos['lat']!, pos['lng']!, isPickup: true);
+                                    } else {
+                                      setState(() {
+                                        message = "Could not get your location. Please allow location access.";
+                                      });
+                                    }
+                                  } else {
+                                    _selectSuggestion({
+                                      "placeId": preset["placeId"],
+                                      "address": preset["address"],
+                                      "lat": preset["lat"],
+                                      "lng": preset["lng"],
+                                    }, isPickup: true);
+                                  }
                                 },
                               ),
                             )),
