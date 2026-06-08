@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/session_service.dart';
 import '../services/socket_service.dart';
 import '../theme/premium_ui.dart';
 import 'driver_negotiation_screen.dart';
 import 'ride_status_screen.dart';
+import 'login_screen.dart';
 
 class DriverScreen extends StatefulWidget {
   final String driverId;
@@ -368,6 +370,17 @@ class _DriverScreenState extends State<DriverScreen> {
             onPressed: _loadDriverStatus,
             tooltip: "Refresh Status",
             icon: const Icon(Icons.refresh_rounded),
+          ),
+          IconButton(
+            onPressed: () {
+              SessionService.clearSession();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+              );
+            },
+            tooltip: "Logout",
+            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
           ),
           const SizedBox(width: 4),
         ],

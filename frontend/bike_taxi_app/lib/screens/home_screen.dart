@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/session_service.dart';
 import '../theme/premium_ui.dart';
 import 'request_ride_screen.dart';
 import 'ride_history_screen.dart';
 import 'driver_list_screen.dart';
 import 'driver_negotiation_screen.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userId;
@@ -264,6 +266,17 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: fetchDashboard,
             tooltip: "Refresh",
             icon: const Icon(Icons.refresh_rounded),
+          ),
+          IconButton(
+            onPressed: () {
+              SessionService.clearSession();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+              );
+            },
+            tooltip: "Logout",
+            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
           ),
           const SizedBox(width: 4),
         ],
