@@ -80,6 +80,15 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  static Future<Map<String, dynamic>> getUserProfile() async {
+    final response = await http.get(
+      Uri.parse("$baseUrl/users/profile"),
+      headers: _authHeaders(),
+    );
+
+    return _handleResponse(response);
+  }
+
   static Future<Map<String, dynamic>> register(
     String name,
     String phone,

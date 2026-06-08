@@ -12,8 +12,13 @@ import 'ride_status_screen.dart';
 
 class RequestRideScreen extends StatefulWidget {
   final String userId;
+  final bool isEmbedded;
 
-  const RequestRideScreen({super.key, required this.userId});
+  const RequestRideScreen({
+    super.key,
+    required this.userId,
+    this.isEmbedded = false,
+  });
 
   @override
   State<RequestRideScreen> createState() => _RequestRideScreenState();
@@ -882,445 +887,448 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Request Ride")),
-      body: PremiumBackdrop(
-        accentColor: AppPalette.primary,
-        secondaryColor: AppPalette.secondary,
-        child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-            children: [
-              const RevealMotion(
-                delay: Duration(milliseconds: 40),
-                beginOffset: Offset(0, -0.1),
-                child: ReflectiveBanner(
-                  colors: [AppPalette.primary, Color(0xFF4F46E5)],
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Route Commander",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        "Craft your ride with\nlive map intelligence.",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 29,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.4,
-                          height: 1.1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+    Widget content = PremiumBackdrop(
+      accentColor: AppPalette.primary,
+      secondaryColor: AppPalette.secondary,
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+          children: [
+            // 1. Trip Preview Header & Map at the very top
+            const Text(
+              "Trip Preview",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: AppPalette.slate900,
               ),
-              const SizedBox(height: 16),
-              RevealMotion(
-                delay: const Duration(milliseconds: 140),
-                child: ReflectionCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Plan Your Ride",
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: AppPalette.slate900,
-                        ),
+            ),
+            const SizedBox(height: 12),
+            _buildPreviewMap(),
+            const SizedBox(height: 16),
+
+            // 2. Plan Your Ride Form Card
+            RevealMotion(
+              delay: const Duration(milliseconds: 140),
+              child: ReflectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Plan Your Ride",
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: AppPalette.slate900,
                       ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        "Type addresses and pick one live Photon result for each stop.",
-                        style: TextStyle(
-                          color: AppPalette.slate500,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      "Type addresses and pick one live Photon result for each stop.",
+                      style: TextStyle(
+                        color: AppPalette.slate500,
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(height: 22),
-                       _buildLocationSearchField(
-                        label: "Pickup Location",
-                        hintText: "Start typing pickup address",
-                        helperText:
-                            "Suggestions appear automatically after 3 characters.",
-                        controller: pickupController,
-                        onChanged: _onPickupChanged,
-                        isSearching: isSearchingPickup,
-                        errorText: pickupError,
-                        icon: Icons.my_location_rounded,
-                      ),
-                      const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            const Text("Quick: ", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppPalette.slate500)),
-                            const SizedBox(width: 4),
-                            ...[
-                              {
-                                "name": "Current Location",
-                                "useGPS": true,
-                              },
-                              {
-                                "name": "Tech Park Gate 1",
-                                "address": "Manyata Tech Park Gate 1, Bangalore",
-                                "lat": 13.0451,
-                                "lng": 77.6266,
-                                "placeId": "techpark_gate1_preset"
-                              }
-                            ].map((preset) => Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ActionChip(
-                                avatar: Icon(
-                                  preset["useGPS"] == true
-                                      ? Icons.gps_fixed_rounded
-                                      : Icons.my_location_rounded,
-                                  size: 12,
-                                  color: AppPalette.primary,
-                                ),
-                                label: Text(preset["name"] as String, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                padding: EdgeInsets.zero,
-                                onPressed: () async {
-                                  if (preset["useGPS"] == true) {
-                                    setState(() {
-                                      message = "Getting your location...";
-                                    });
-                                    final pos = await LocationService.getCurrentPosition();
-                                    if (!mounted) return;
-                                    if (pos != null) {
-                                      final label = "My Location (${pos['lat']!.toStringAsFixed(5)}, ${pos['lng']!.toStringAsFixed(5)})";
-                                      _selectSuggestion({
-                                        "placeId": "gps_current_loc",
-                                        "address": label,
-                                        "lat": pos['lat'],
-                                        "lng": pos['lng'],
-                                      }, isPickup: true);
+                    ),
+                    const SizedBox(height: 22),
+                    _buildLocationSearchField(
+                      label: "Pickup Location",
+                      hintText: "Start typing pickup address",
+                      helperText:
+                          "Suggestions appear automatically after 3 characters.",
+                      controller: pickupController,
+                      onChanged: _onPickupChanged,
+                      isSearching: isSearchingPickup,
+                      errorText: pickupError,
+                      icon: Icons.my_location_rounded,
+                    ),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          const Text("Quick: ",
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppPalette.slate500)),
+                          const SizedBox(width: 4),
+                          ...[
+                            {
+                              "name": "Current Location",
+                              "useGPS": true,
+                            },
+                            {
+                              "name": "Tech Park Gate 1",
+                              "address": "Manyata Tech Park Gate 1, Bangalore",
+                              "lat": 13.0451,
+                              "lng": 77.6266,
+                              "placeId": "techpark_gate1_preset"
+                            }
+                          ].map((preset) => Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ActionChip(
+                                  avatar: Icon(
+                                    preset["useGPS"] == true
+                                        ? Icons.gps_fixed_rounded
+                                        : Icons.my_location_rounded,
+                                    size: 12,
+                                    color: AppPalette.primary,
+                                  ),
+                                  label: Text(preset["name"] as String,
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold)),
+                                  padding: EdgeInsets.zero,
+                                  onPressed: () async {
+                                    if (preset["useGPS"] == true) {
                                       setState(() {
-                                        message = "Pickup set to your current location";
+                                        message = "Getting your location...";
                                       });
-                                      _reverseGeocodeAndUpdate(pos['lat']!, pos['lng']!, isPickup: true);
+                                      final pos = await LocationService
+                                          .getCurrentPosition();
+                                      if (!mounted) return;
+                                      if (pos != null) {
+                                        final label =
+                                            "My Location (${pos['lat']!.toStringAsFixed(5)}, ${pos['lng']!.toStringAsFixed(5)})";
+                                        _selectSuggestion({
+                                          "placeId": "gps_current_loc",
+                                          "address": label,
+                                          "lat": pos['lat'],
+                                          "lng": pos['lng'],
+                                        }, isPickup: true);
+                                        setState(() {
+                                          message =
+                                              "Pickup set to your current location";
+                                        });
+                                        _reverseGeocodeAndUpdate(
+                                            pos['lat']!, pos['lng']!,
+                                            isPickup: true);
+                                      } else {
+                                        setState(() {
+                                          message =
+                                              "Could not get your location. Please allow location access.";
+                                        });
+                                      }
                                     } else {
-                                      setState(() {
-                                        message = "Could not get your location. Please allow location access.";
-                                      });
+                                      _selectSuggestion({
+                                        "placeId": preset["placeId"],
+                                        "address": preset["address"],
+                                        "lat": preset["lat"],
+                                        "lng": preset["lng"],
+                                      }, isPickup: true);
                                     }
-                                  } else {
+                                  },
+                                ),
+                              )),
+                        ],
+                      ),
+                    ),
+                    _buildSuggestionsList(pickupSuggestions, isPickup: true),
+                    _buildSelectionSummary(
+                      title: "Pickup selected",
+                      address: pickupAddress,
+                      lat: pickupLat,
+                      lng: pickupLng,
+                      accent: const Color(0xFF16A34A),
+                    ),
+                    const SizedBox(height: 15),
+                    _buildLocationSearchField(
+                      label: "Drop Location",
+                      hintText: "Start typing destination address",
+                      helperText:
+                          "Suggestions appear automatically after 3 characters.",
+                      controller: destinationController,
+                      onChanged: _onDropChanged,
+                      isSearching: isSearchingDrop,
+                      errorText: dropError,
+                      icon: Icons.flag_rounded,
+                    ),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          const Text("Quick: ",
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppPalette.slate500)),
+                          const SizedBox(width: 4),
+                          ...[
+                            {
+                              "name": "Home",
+                              "address":
+                                  "123 Green Glen Layout, Outer Ring Road, Bangalore",
+                              "lat": 12.9279,
+                              "lng": 77.6271,
+                              "placeId": "home_preset"
+                            },
+                            {
+                              "name": "Office",
+                              "address":
+                                  "Embassy TechVillage, Bellandur, Bangalore",
+                              "lat": 12.9784,
+                              "lng": 77.6408,
+                              "placeId": "office_preset"
+                            },
+                            {
+                              "name": "Metro Station",
+                              "address": "Indiranagar Metro Station, Bangalore",
+                              "lat": 12.9716,
+                              "lng": 77.5946,
+                              "placeId": "metro_preset"
+                            },
+                            {
+                              "name": "Airport",
+                              "address":
+                                  "Kempegowda International Airport, Bangalore",
+                              "lat": 13.1986,
+                              "lng": 77.7066,
+                              "placeId": "airport_preset"
+                            }
+                          ].map((preset) => Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ActionChip(
+                                  avatar: const Icon(Icons.place_rounded,
+                                      size: 12, color: AppPalette.accent),
+                                  label: Text(preset["name"] as String,
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold)),
+                                  padding: EdgeInsets.zero,
+                                  onPressed: () {
                                     _selectSuggestion({
                                       "placeId": preset["placeId"],
                                       "address": preset["address"],
                                       "lat": preset["lat"],
                                       "lng": preset["lng"],
-                                    }, isPickup: true);
-                                  }
-                                },
-                              ),
-                            )),
-                          ],
+                                    }, isPickup: false);
+                                  },
+                                ),
+                              )),
+                        ],
+                      ),
+                    ),
+                    _buildSuggestionsList(dropSuggestions, isPickup: false),
+                    _buildSelectionSummary(
+                      title: "Drop selected",
+                      address: dropAddress,
+                      lat: dropLat,
+                      lng: dropLng,
+                      accent: const Color(0xFFDC2626),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Booking Mode",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: AppPalette.slate900,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SegmentedButton<String>(
+                      style: ButtonStyle(
+                        textStyle: WidgetStateProperty.all(
+                          const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        side: WidgetStateProperty.all(
+                          BorderSide(
+                            color: AppPalette.primary.withOpacity(0.26),
+                          ),
                         ),
                       ),
-                      _buildSuggestionsList(pickupSuggestions, isPickup: true),
-                      _buildSelectionSummary(
-                        title: "Pickup selected",
-                        address: pickupAddress,
-                        lat: pickupLat,
-                        lng: pickupLng,
-                        accent: const Color(0xFF16A34A),
-                      ),
-                      const SizedBox(height: 15),
-                       _buildLocationSearchField(
-                        label: "Drop Location",
-                        hintText: "Start typing destination address",
-                        helperText:
-                            "Suggestions appear automatically after 3 characters.",
-                        controller: destinationController,
-                        onChanged: _onDropChanged,
-                        isSearching: isSearchingDrop,
-                        errorText: dropError,
-                        icon: Icons.flag_rounded,
-                      ),
-                      const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
+                      segments: const [
+                        ButtonSegment<String>(
+                          value: "normal",
+                          label: Text("Normal"),
+                          icon: Icon(Icons.local_taxi_rounded),
+                        ),
+                        ButtonSegment<String>(
+                          value: "negotiation",
+                          label: Text("Negotiation"),
+                          icon: Icon(Icons.sell_rounded),
+                        ),
+                      ],
+                      selected: {bookingMode},
+                      onSelectionChanged: (selection) {
+                        setState(() {
+                          bookingMode = selection.first;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    GestureDetector(
+                      onTap: estimatedFare == null ? null : _showFareBreakdown,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFDBEAFE).withOpacity(0.55),
+                              Colors.white.withOpacity(0.72),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: const Color(0xFFBFDBFE).withOpacity(0.7),
+                          ),
+                        ),
                         child: Row(
                           children: [
-                            const Text("Quick: ", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppPalette.slate500)),
-                            const SizedBox(width: 4),
-                            ...[
-                              {
-                                "name": "Home",
-                                "address": "123 Green Glen Layout, Outer Ring Road, Bangalore",
-                                "lat": 12.9279,
-                                "lng": 77.6271,
-                                "placeId": "home_preset"
-                              },
-                              {
-                                "name": "Office",
-                                "address": "Embassy TechVillage, Bellandur, Bangalore",
-                                "lat": 12.9784,
-                                "lng": 77.6408,
-                                "placeId": "office_preset"
-                              },
-                              {
-                                "name": "Metro Station",
-                                "address": "Indiranagar Metro Station, Bangalore",
-                                "lat": 12.9716,
-                                "lng": 77.5946,
-                                "placeId": "metro_preset"
-                              },
-                              {
-                                "name": "Airport",
-                                "address": "Kempegowda International Airport, Bangalore",
-                                "lat": 13.1986,
-                                "lng": 77.7066,
-                                "placeId": "airport_preset"
-                              }
-                            ].map((preset) => Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ActionChip(
-                                avatar: const Icon(Icons.place_rounded, size: 12, color: AppPalette.accent),
-                                label: Text(preset["name"] as String, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                padding: EdgeInsets.zero,
-                                onPressed: () {
-                                  _selectSuggestion({
-                                    "placeId": preset["placeId"],
-                                    "address": preset["address"],
-                                    "lat": preset["lat"],
-                                    "lng": preset["lng"],
-                                  }, isPickup: false);
-                                },
-                              ),
-                            )),
-                          ],
-                        ),
-                      ),
-                      _buildSuggestionsList(dropSuggestions, isPickup: false),
-                      _buildSelectionSummary(
-                        title: "Drop selected",
-                        address: dropAddress,
-                        lat: dropLat,
-                        lng: dropLng,
-                        accent: const Color(0xFFDC2626),
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        "Booking Mode",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: AppPalette.slate900,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SegmentedButton<String>(
-                        style: ButtonStyle(
-                          textStyle: WidgetStateProperty.all(
-                            const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          side: WidgetStateProperty.all(
-                            BorderSide(
-                              color: AppPalette.primary.withOpacity(0.26),
+                            const Icon(
+                              Icons.payments_outlined,
+                              color: AppPalette.slate600,
                             ),
-                          ),
-                        ),
-                        segments: const [
-                          ButtonSegment<String>(
-                            value: "normal",
-                            label: Text("Normal"),
-                            icon: Icon(Icons.local_taxi_rounded),
-                          ),
-                          ButtonSegment<String>(
-                            value: "negotiation",
-                            label: Text("Negotiation"),
-                            icon: Icon(Icons.sell_rounded),
-                          ),
-                        ],
-                        selected: {bookingMode},
-                        onSelectionChanged: (selection) {
-                          setState(() {
-                            bookingMode = selection.first;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      GestureDetector(
-                        onTap: estimatedFare == null ? null : _showFareBreakdown,
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                const Color(0xFFDBEAFE).withOpacity(0.55),
-                                Colors.white.withOpacity(0.72),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: const Color(0xFFBFDBFE).withOpacity(0.7),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.payments_outlined,
-                                color: AppPalette.slate600,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        "Estimated Fare",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          color: AppPalette.slate900,
+                                        ),
+                                      ),
+                                      if (estimatedFare != null)
                                         const Text(
-                                          "Estimated Fare",
+                                          "Tap for breakdown",
                                           style: TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            color: AppPalette.slate900,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppPalette.primary,
                                           ),
                                         ),
-                                        if (estimatedFare != null)
-                                          const Text(
-                                            "Tap for breakdown",
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppPalette.primary,
-                                            ),
-                                          ),
-                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    estimatedFare == null
+                                        ? "Select pickup and drop to calculate fare."
+                                        : "Approx. Rs. ${estimatedFare!.toStringAsFixed(2)}",
+                                    style: const TextStyle(
+                                      color: AppPalette.slate600,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      estimatedFare == null
-                                          ? "Select pickup and drop to calculate fare."
-                                          : "Approx. Rs. ${estimatedFare!.toStringAsFixed(2)}",
-                                      style: const TextStyle(
-                                        color: AppPalette.slate600,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        "Trip Preview",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: AppPalette.slate900,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildPreviewMap(),
-                      const SizedBox(height: 15),
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedPaymentMethod,
-                        decoration: const InputDecoration(
-                          labelText: "Payment Method",
-                          prefixIcon: Icon(
-                            Icons.account_balance_wallet_rounded,
-                          ),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: "Cash", child: Text("Cash")),
-                          DropdownMenuItem(value: "UPI", child: Text("UPI")),
-                          DropdownMenuItem(value: "Card", child: Text("Card")),
-                        ],
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() {
-                            selectedPaymentMethod = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 22),
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 240),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppPalette.primary.withOpacity(
-                                canSubmit ? 0.28 : 0.14,
-                              ),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
                             ),
                           ],
                         ),
-                        child: ElevatedButton(
-                          onPressed: canSubmit ? requestRide : null,
-                          style: ElevatedButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 54),
-                          ),
-                          child: isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.1,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Text(
-                                  bookingMode == "negotiation"
-                                      ? "Negotiate Ride"
-                                      : "Book Ride",
-                                ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedPaymentMethod,
+                      decoration: const InputDecoration(
+                        labelText: "Payment Method",
+                        prefixIcon: Icon(
+                          Icons.account_balance_wallet_rounded,
                         ),
                       ),
-                    ],
-                  ),
+                      items: const [
+                        DropdownMenuItem(value: "Cash", child: Text("Cash")),
+                        DropdownMenuItem(value: "UPI", child: Text("UPI")),
+                        DropdownMenuItem(value: "Card", child: Text("Card")),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() {
+                          selectedPaymentMethod = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 22),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 240),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppPalette.primary.withOpacity(
+                              canSubmit ? 0.28 : 0.14,
+                            ),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: canSubmit ? requestRide : null,
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 54),
+                        ),
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.1,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                bookingMode == "negotiation"
+                                    ? "Negotiate Ride"
+                                    : "Book Ride",
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 260),
-                child: message.isEmpty
-                    ? const SizedBox.shrink()
-                    : Padding(
-                        key: ValueKey(message),
-                        padding: const EdgeInsets.only(top: 16),
-                        child: ReflectionCard(
-                          padding: const EdgeInsets.all(16),
-                          borderRadius: BorderRadius.circular(18),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.info_outline_rounded,
-                                color: AppPalette.slate600,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  message,
-                                  style: const TextStyle(
-                                    color: AppPalette.slate600,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+            ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              child: message.isEmpty
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      key: ValueKey(message),
+                      padding: const EdgeInsets.only(top: 16),
+                      child: ReflectionCard(
+                        padding: const EdgeInsets.all(16),
+                        borderRadius: BorderRadius.circular(18),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline_rounded,
+                              color: AppPalette.slate600,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                message,
+                                style: const TextStyle(
+                                  color: AppPalette.slate600,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-              ),
-            ],
-          ),
+                    ),
+            ),
+          ],
         ),
       ),
+    );
+
+    if (widget.isEmbedded) {
+      return content;
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text("Request Ride")),
+      body: content,
     );
   }
 }

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/session_service.dart';
 import '../theme/premium_ui.dart';
+import 'driver_screen.dart';
+import 'home_screen.dart';
 import 'login_screen.dart';
+
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -69,6 +73,189 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
     }
   }
+
+  void loginWithGoogle() async {
+    setState(() {
+      isLoading = true;
+      message = "";
+    });
+
+    final selectedEmail = await showDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Image.network(
+                      "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png",
+                      height: 24,
+                      errorBuilder: (c, e, s) => const Icon(Icons.g_mobiledata_rounded, color: AppPalette.primary, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      "Sign in with Google",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "Choose an account to continue to RideGo",
+                  style: TextStyle(
+                    color: AppPalette.slate500,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: AppPalette.primary,
+                    child: Text("NK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                  title: const Text("Nithish Kumar", style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text("nithish.kumar@gmail.com"),
+                  onTap: () => Navigator.pop(context, "nithish.kumar@gmail.com"),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: AppPalette.secondary,
+                    child: Text("GU", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                  title: const Text("Guest User", style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text("guest.taxi@gmail.com"),
+                  onTap: () => Navigator.pop(context, "guest.taxi@gmail.com"),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selectedEmail == null) {
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 28, vertical: 22),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: AppPalette.primary),
+                SizedBox(width: 18),
+                Text(
+                  "Connecting to Google...",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await Future.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+    Navigator.pop(context); // Close connecting dialog
+
+    final mockPhone = isDriver ? "8888888888" : "9999999999";
+    final mockName = selectedEmail.startsWith("nithish") ? "Nithish Kumar (Google)" : "Guest User (Google)";
+    const mockPassword = "google-sign-in-password-auth";
+
+    try {
+      Map<String, dynamic> loginResponse;
+      try {
+        loginResponse = await ApiService.login(
+          mockPhone,
+          mockPassword,
+          role: isDriver ? "driver" : "user",
+        );
+      } catch (loginErr) {
+        if (loginErr.toString().contains("User not found")) {
+          await ApiService.register(
+            mockName,
+            mockPhone,
+            mockPassword,
+            role: isDriver ? "driver" : "user",
+          );
+          loginResponse = await ApiService.login(
+            mockPhone,
+            mockPassword,
+            role: isDriver ? "driver" : "user",
+          );
+        } else {
+          rethrow;
+        }
+      }
+
+      if (loginResponse["message"] == "Login successful" &&
+          loginResponse["token"] != null &&
+          loginResponse["userId"] != null) {
+        ApiService.token = loginResponse["token"];
+        SessionService.saveSession(
+          loginResponse["token"],
+          loginResponse["userId"],
+          isDriver ? "driver" : "user",
+        );
+        if (!mounted) return;
+
+        if (isDriver) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DriverScreen(driverId: loginResponse["userId"]),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(userId: loginResponse["userId"]),
+            ),
+          );
+        }
+      } else {
+        setState(() {
+          message = loginResponse["message"] ?? "Google Login failed";
+        });
+      }
+    } catch (e) {
+      print("GOOGLE AUTH ERROR: $e");
+      setState(() {
+        message = e.toString().replaceFirst("Exception: ", "");
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
 
   @override
   void dispose() {
@@ -272,6 +459,53 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 "Already have an account? Login",
                               ),
                             ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(child: Divider(color: AppPalette.slate300.withOpacity(0.5))),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 12),
+                                  child: Text(
+                                    "OR",
+                                    style: TextStyle(
+                                      color: AppPalette.slate500,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(child: Divider(color: AppPalette.slate300.withOpacity(0.5))),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 54),
+                                side: BorderSide(color: AppPalette.slate300.withOpacity(0.7)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                              ),
+                              onPressed: isLoading ? null : loginWithGoogle,
+                              icon: Image.network(
+                                "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png",
+                                height: 22,
+                                errorBuilder: (context, error, stackTrace) => const Icon(
+                                  Icons.account_circle_rounded,
+                                  color: AppPalette.primary,
+                                  size: 22,
+                                ),
+                              ),
+                              label: const Text(
+                                "Continue with Google",
+                                style: TextStyle(
+                                  color: AppPalette.slate900,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+
                             AnimatedSwitcher(
                               duration: const Duration(milliseconds: 280),
                               child: message.isEmpty
