@@ -22,7 +22,7 @@ class BikeTaxiApp extends StatelessWidget {
   Widget build(BuildContext context) {
     const seedColor = AppPalette.primary;
     final baseTextTheme = GoogleFonts.poppinsTextTheme(
-      ThemeData(brightness: Brightness.light).textTheme,
+      ThemeData(brightness: Brightness.dark).textTheme,
     );
 
     // Check for saved session
@@ -41,9 +41,10 @@ class BikeTaxiApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
+        brightness: Brightness.dark,
         colorScheme: ColorScheme.fromSeed(
           seedColor: seedColor,
-          brightness: Brightness.light,
+          brightness: Brightness.dark,
         ),
         scaffoldBackgroundColor: AppPalette.background,
         textTheme: baseTextTheme.apply(
@@ -74,8 +75,8 @@ class BikeTaxiApp extends StatelessWidget {
         ),
         cardTheme: CardThemeData(
           elevation: 2,
-          color: Colors.white.withOpacity(0.92),
-          shadowColor: const Color(0xFF0F172A).withOpacity(0.08),
+          color: Colors.white.withOpacity(0.06),
+          shadowColor: Colors.black.withOpacity(0.4),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(26),
           ),
@@ -83,27 +84,27 @@ class BikeTaxiApp extends StatelessWidget {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.white.withOpacity(0.86),
+          fillColor: Colors.white.withOpacity(0.05),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 18,
             vertical: 18,
           ),
           labelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
-            color: AppPalette.slate500,
+            color: AppPalette.slate700,
           ),
           hintStyle: const TextStyle(
             fontWeight: FontWeight.w500,
-            color: AppPalette.slate500,
+            color: AppPalette.slate700,
           ),
-          prefixIconColor: AppPalette.slate500,
+          prefixIconColor: AppPalette.slate700,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
@@ -114,7 +115,7 @@ class BikeTaxiApp extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             elevation: 1,
             backgroundColor: seedColor,
-            foregroundColor: Colors.white,
+            foregroundColor: AppPalette.navy900,
             minimumSize: const Size(double.infinity, 56),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
@@ -127,9 +128,9 @@ class BikeTaxiApp extends StatelessWidget {
           ),
         ),
         snackBarTheme: SnackBarThemeData(
-          backgroundColor: AppPalette.navy900,
+          backgroundColor: AppPalette.background,
           contentTextStyle: baseTextTheme.bodyMedium?.copyWith(
-            color: Colors.white,
+            color: AppPalette.slate900,
             fontWeight: FontWeight.w600,
           ),
           behavior: SnackBarBehavior.floating,

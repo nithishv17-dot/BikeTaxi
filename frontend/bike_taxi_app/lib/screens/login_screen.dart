@@ -56,10 +56,18 @@ class _LoginScreenState extends State<LoginScreen> {
           response["token"],
           response["userId"],
           isDriver ? "driver" : "user",
+          name: response["name"]?.toString(),
+          phone: response["phone"]?.toString(),
         );
         if (!mounted) return;
 
         if (isDriver) {
+          try {
+            await ApiService.toggleDriver(response["userId"], isAvailable: true);
+          } catch (e) {
+            print("Auto-set online error: $e");
+          }
+          if (!mounted) return;
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -239,10 +247,18 @@ class _LoginScreenState extends State<LoginScreen> {
           loginResponse["token"],
           loginResponse["userId"],
           isDriver ? "driver" : "user",
+          name: loginResponse["name"]?.toString(),
+          phone: loginResponse["phone"]?.toString(),
         );
         if (!mounted) return;
 
         if (isDriver) {
+          try {
+            await ApiService.toggleDriver(loginResponse["userId"], isAvailable: true);
+          } catch (e) {
+            print("Auto-set online error: $e");
+          }
+          if (!mounted) return;
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -520,16 +536,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.all(14),
                                         decoration: BoxDecoration(
-                                          color: const Color(
-                                            0xFFEFF6FF,
-                                          ).withOpacity(0.8),
+                                          color: const Color(0xFF93000A).withOpacity(0.15),
                                           borderRadius: BorderRadius.circular(
                                             16,
                                           ),
                                           border: Border.all(
-                                            color: const Color(
-                                              0xFF93C5FD,
-                                            ).withOpacity(0.6),
+                                            color: const Color(0xFFFFB4AB).withOpacity(0.3),
                                           ),
                                         ),
                                         child: Text(
@@ -538,6 +550,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           style: const TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w600,
+                                            color: Color(0xFFFFB4AB),
                                           ),
                                         ),
                                       ),

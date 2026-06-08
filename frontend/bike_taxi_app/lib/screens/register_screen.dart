@@ -219,10 +219,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
           loginResponse["token"],
           loginResponse["userId"],
           isDriver ? "driver" : "user",
+          name: loginResponse["name"]?.toString(),
+          phone: loginResponse["phone"]?.toString(),
         );
         if (!mounted) return;
 
         if (isDriver) {
+          try {
+            await ApiService.toggleDriver(loginResponse["userId"], isAvailable: true);
+          } catch (e) {
+            print("Auto-set online error: $e");
+          }
+          if (!mounted) return;
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -515,12 +523,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.all(14),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFECFDF5),
+                                          color: Colors.white.withOpacity(0.05),
                                           borderRadius: BorderRadius.circular(
                                             16,
                                           ),
                                           border: Border.all(
-                                            color: const Color(0xFF86EFAC),
+                                            color: Colors.white.withOpacity(0.1),
                                           ),
                                         ),
                                         child: Text(
@@ -529,6 +537,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                           style: const TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w600,
+                                            color: AppPalette.slate900,
                                           ),
                                         ),
                                       ),

@@ -5,7 +5,7 @@ exports.getDrivers = async (req, res) => {
   try {
     const drivers = await User.find(
       { role: "driver" },
-      { name: 1, phone: 1, isAvailable: 1, role: 1 }
+      { name: 1, phone: 1, isAvailable: 1, role: 1, location: 1 }
     ).lean();
 
     return res.status(200).json({
@@ -38,7 +38,11 @@ exports.toggleAvailability = async (req, res) => {
       });
     }
 
-    driver.isAvailable = !driver.isAvailable;
+    if (req.body.isAvailable !== undefined) {
+      driver.isAvailable = !!req.body.isAvailable;
+    } else {
+      driver.isAvailable = !driver.isAvailable;
+    }
     await driver.save();
 
     return res.status(200).json({

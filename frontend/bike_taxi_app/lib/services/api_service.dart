@@ -49,10 +49,11 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  static Future<Map<String, dynamic>> toggleDriver(String driverId) async {
+  static Future<Map<String, dynamic>> toggleDriver(String driverId, {bool? isAvailable}) async {
     final response = await http.post(
       Uri.parse("$baseUrl/drivers/toggle/$driverId"),
       headers: _authHeaders(),
+      body: isAvailable != null ? jsonEncode({"isAvailable": isAvailable}) : null,
     );
 
     return _handleResponse(response);
@@ -84,6 +85,16 @@ class ApiService {
     final response = await http.get(
       Uri.parse("$baseUrl/users/profile"),
       headers: _authHeaders(),
+    );
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateLocation(double lat, double lng) async {
+    final response = await http.post(
+      Uri.parse("$baseUrl/users/location"),
+      headers: _authHeaders(),
+      body: jsonEncode({"lat": lat, "lng": lng}),
     );
 
     return _handleResponse(response);

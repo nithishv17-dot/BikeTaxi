@@ -55,6 +55,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   void dispose() {
     countdownTimer?.cancel();
     SocketService.removeAllRideListeners();
+    SocketService.stopListeningDriverLocationUpdated();
     otpController.dispose();
     super.dispose();
   }
@@ -245,6 +246,42 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         data,
         "Negotiation timed out. Retry negotiation or move to normal booking.",
       );
+    });
+
+    SocketService.listenDriverLocationUpdated((data) {
+      if (data == null) return;
+      final driverId = data["driverId"]?.toString() ?? "";
+      final lat = data["lat"];
+      final lng = data["lng"];
+      
+      String? currentDriverId;
+      if (ride != null && ride!["driverId"] != null) {
+        final driverData = ride!["driverId"];
+        if (driverData is Map) {
+          currentDriverId = driverData["_id"]?.toString();
+        } else {
+          currentDriverId = driverData.toString();
+        }
+      }
+
+      if (mounted && driverId.isNotEmpty && currentDriverId == driverId) {
+        setState(() {
+          if (ride != null) {
+            final nextRide = Map<String, dynamic>.from(ride!);
+            if (nextRide["driverId"] is Map) {
+              final driverMap = Map<String, dynamic>.from(nextRide["driverId"]);
+              driverMap["location"] = {"lat": lat, "lng": lng};
+              nextRide["driverId"] = driverMap;
+            } else {
+              nextRide["driverId"] = {
+                "_id": driverId,
+                "location": {"lat": lat, "lng": lng}
+              };
+            }
+            ride = nextRide;
+          }
+        });
+      }
     });
   }
 
@@ -1026,7 +1063,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             child: Text(
               value,
               style: const TextStyle(
-                color: Color(0xFF0F172A),
+                color: AppPalette.slate900,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1057,12 +1094,13 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF7ED),
+              color: AppPalette.primary.withOpacity(0.12),
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppPalette.primary.withOpacity(0.3)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.timer_outlined, color: Color(0xFFEA580C)),
+                const Icon(Icons.timer_outlined, color: AppPalette.primary),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -1092,9 +1130,9 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                 margin: const EdgeInsets.only(top: 12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withOpacity(0.6)),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
                 ),
                 child: Row(
                   children: [
@@ -1144,21 +1182,21 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF1F2).withOpacity(0.9),
+        color: const Color(0xFF93000A).withOpacity(0.15),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFFECDD3)),
+        border: Border.all(color: const Color(0xFFFFB4AB).withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             "Negotiation Timed Out",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF9F1239)),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFFFFB4AB)),
           ),
           const SizedBox(height: 8),
           const Text(
             "No offer was confirmed before the countdown ended. You can start a fresh negotiation or switch to direct booking.",
-            style: TextStyle(color: Color(0xFFBE123C), fontWeight: FontWeight.w600),
+            style: TextStyle(color: Color(0xFFFFDAD6), fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 16),
           Wrap(
@@ -1312,6 +1350,101 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
+                      ReflectionCard(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Route Details",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: AppPalette.slate900,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF16A34A).withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.18)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.my_location_rounded, color: Color(0xFF16A34A), size: 24),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          "Pickup Point",
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF16A34A),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          pickupAddress,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppPalette.slate900,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDC2626).withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFFDC2626).withOpacity(0.18)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.flag_rounded, color: Color(0xFFDC2626), size: 24),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          "Drop Point",
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFFDC2626),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          dropAddress,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppPalette.slate900,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
                       if (isNegotiationWaiting) ...[
                         _buildOffersSection(),
                         const SizedBox(height: 20),
@@ -1339,9 +1472,9 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                 width: double.infinity,
                                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFEF3C7),
+                                  color: AppPalette.accent.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: const Color(0xFFFCD34D)),
+                                  border: Border.all(color: AppPalette.accent.withOpacity(0.3)),
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1354,7 +1487,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                           style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w800,
-                                            color: Color(0xFFB45309),
+                                            color: AppPalette.primary,
                                             letterSpacing: 0.5,
                                           ),
                                         ),
@@ -1363,7 +1496,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                           "Give this OTP to start the ride",
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: Color(0xFF78350F),
+                                            color: AppPalette.slate700,
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
@@ -1374,7 +1507,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                       style: const TextStyle(
                                         fontSize: 24,
                                         fontWeight: FontWeight.w900,
-                                        color: Color(0xFF92400E),
+                                        color: AppPalette.primary,
                                         letterSpacing: 2,
                                       ),
                                     ),
@@ -1384,8 +1517,6 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                               const SizedBox(height: 16),
                             ],
                             _buildInfoRow("Booking Mode", bookingMode),
-                            _buildInfoRow("Pickup", pickupAddress),
-                            _buildInfoRow("Drop", dropAddress),
                             _buildInfoRow("Fare", "Rs. $fare"),
                             _buildInfoRow("Offered Fare", offeredFare),
                             _buildInfoRow("Negotiation", negotiationStatus),

@@ -77,7 +77,9 @@ router.post("/login", async (req, res) => {
       ),
       userId: user._id,
       role: user.role,
-      isAvailable: user.isAvailable || false
+      isAvailable: user.isAvailable || false,
+      name: user.name,
+      phone: user.phone
     });
   } catch (error) {
     console.log("LOGIN ERROR:", error);
@@ -101,6 +103,34 @@ router.get("/profile", authMiddleware, async (req, res) => {
       phone: user.phone,
       role: user.role
     });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/location", authMiddleware, async (req, res) => {
+  try {
+    const { lat, lng } = req.body;
+    if (lat === undefined || lng === undefined) {
+      return res.status(400).json({ message: "Latitude and longitude are required" });
+    }
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    user.location = { lat: Number(lat), lng: Number(lng) };
+    await user.save();
+
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("driverLocationUpdated", {
+        driverId: user._id,
+        lat: Number(lat),
+        lng: Number(lng)
+      });
+    }
+
+    return res.status(200).json({ message: "Location updated successfully" });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

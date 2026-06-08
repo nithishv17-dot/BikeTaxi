@@ -81,6 +81,16 @@ class SocketService {
     });
   }
 
+  static void listenDriverLocationUpdated(Function callback) {
+    socket.on("driverLocationUpdated", (data) {
+      callback(data);
+    });
+  }
+
+  static void stopListeningDriverLocationUpdated() {
+    socket.off("driverLocationUpdated");
+  }
+
   static void removeAllRideListeners() {
     socket.off("rideRequested");
     socket.off("rideAccepted");

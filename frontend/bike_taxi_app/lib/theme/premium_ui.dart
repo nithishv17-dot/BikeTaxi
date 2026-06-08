@@ -5,26 +5,26 @@ import 'package:flutter/material.dart';
 
 class AppPalette {
   // Premium Design System Tokens
-  static const Color primary = Color(0xFF2563EB);
-  static const Color secondary = Color(0xFF10B981);
-  static const Color accent = Color(0xFFF59E0B);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color textPrimary = Color(0xFF0F172A);
+  static const Color primary = Color(0xFFFFB77D);
+  static const Color secondary = Color(0xFFC8C6C5);
+  static const Color accent = Color(0xFFFF8C00);
+  static const Color background = Color(0xFF121414);
+  static const Color textPrimary = Color(0xFFE2E2E2);
 
   // Backward compatibility mappings for smooth migration
-  static const Color navy900 = Color(0xFF0B132A);
-  static const Color slate900 = Color(0xFF0F172A);
-  static const Color slate700 = Color(0xFF334155);
-  static const Color slate600 = Color(0xFF475569);
-  static const Color slate500 = Color(0xFF64748B);
-  static const Color slate300 = Color(0xFFCBD5E1);
-  static const Color teal600 = Color(0xFF2563EB); // Maps to primary
-  static const Color teal500 = Color(0xFF2563EB); // Maps to primary
-  static const Color sky500 = Color(0xFF10B981);  // Maps to secondary
-  static const Color amber500 = Color(0xFFF59E0B); // Maps to accent
-  static const Color mint50 = Color(0xFFEFF6FF);  // soft blue tint
-  static const Color cloud50 = Color(0xFFF8FAFC); // background
-  static const Color ice50 = Color(0xFFF8FAFC);   // background
+  static const Color navy900 = Color(0xFF121414);
+  static const Color slate900 = Color(0xFFE2E2E2);
+  static const Color slate700 = Color(0xFFC8C6C5);
+  static const Color slate600 = Color(0xFF8C8A89);
+  static const Color slate500 = Color(0xFF564334);
+  static const Color slate300 = Color(0xFF333535);
+  static const Color teal600 = Color(0xFFFFB77D);
+  static const Color teal500 = Color(0xFFFFB77D);
+  static const Color sky500 = Color(0xFFC8C6C5);
+  static const Color amber500 = Color(0xFFFF8C00);
+  static const Color mint50 = Color(0xFF121414);
+  static const Color cloud50 = Color(0xFF1A1C1C);
+  static const Color ice50 = Color(0xFF121414);
 }
 
 class PremiumBackdrop extends StatefulWidget {
@@ -64,7 +64,7 @@ class _PremiumBackdropState extends State<PremiumBackdrop>
 
   Widget _buildGlowBlob(Color color, double size) {
     return ImageFiltered(
-      imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+      imageFilter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
       child: Container(
         width: size,
         height: size,
@@ -92,9 +92,9 @@ class _PremiumBackdropState extends State<PremiumBackdrop>
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      AppPalette.mint50,
-                      AppPalette.cloud50,
-                      Colors.white,
+                      AppPalette.background,
+                      Color(0xFF1A1C1C),
+                      AppPalette.background,
                     ],
                     stops: const [0.0, 0.55, 1.0],
                   ),
@@ -104,13 +104,13 @@ class _PremiumBackdropState extends State<PremiumBackdrop>
             Positioned(
               top: -120 + topDrift,
               right: -60 + sideDrift,
-              child: _buildGlowBlob(widget.accentColor.withOpacity(0.22), 260),
+              child: _buildGlowBlob(widget.accentColor.withOpacity(0.08), 260),
             ),
             Positioned(
               top: 180 - sideDrift,
               left: -130,
               child: _buildGlowBlob(
-                widget.secondaryColor.withOpacity(0.18),
+                widget.secondaryColor.withOpacity(0.06),
                 300,
               ),
             ),
@@ -118,7 +118,7 @@ class _PremiumBackdropState extends State<PremiumBackdrop>
               bottom: -140 + bottomDrift,
               right: 40,
               child: _buildGlowBlob(
-                const Color(0xFF22D3EE).withOpacity(0.14),
+                const Color(0xFF7AD0FF).withOpacity(0.05),
                 280,
               ),
             ),
@@ -129,9 +129,9 @@ class _PremiumBackdropState extends State<PremiumBackdrop>
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.white.withOpacity(0.34),
+                      Colors.black.withOpacity(0.2),
                       Colors.transparent,
-                      Colors.white.withOpacity(0.55),
+                      Colors.black.withOpacity(0.4),
                     ],
                   ),
                 ),
@@ -173,14 +173,14 @@ class ReflectionCard extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  tintColor.withOpacity(0.88),
-                  Colors.white.withOpacity(0.72),
+                  Colors.white.withOpacity(0.06),
+                  Colors.white.withOpacity(0.02),
                 ],
               ),
-              border: Border.all(color: Colors.white.withOpacity(0.7)),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0F172A).withOpacity(0.12),
+                  color: Colors.black.withOpacity(0.4),
                   blurRadius: 24,
                   offset: const Offset(0, 14),
                 ),
@@ -200,8 +200,8 @@ class ReflectionCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Colors.white.withOpacity(0.36),
-                      Colors.white.withOpacity(0.04),
+                      Colors.white.withOpacity(0.08),
+                      Colors.white.withOpacity(0.01),
                       Colors.transparent,
                     ],
                     stops: const [0.0, 0.38, 1.0],

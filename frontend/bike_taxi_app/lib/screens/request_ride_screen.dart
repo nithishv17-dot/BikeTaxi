@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../services/api_service.dart';
 import '../services/location_service.dart';
+import '../services/socket_service.dart';
 import '../theme/premium_ui.dart';
 import 'ride_status_screen.dart';
 
@@ -53,6 +54,62 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
   String? dropError;
   String message = "";
   bool isLoading = false;
+
+  List<Map<String, dynamic>> availableDrivers = [];
+  Timer? _driversPollTimer;
+
+  void _startDriversPolling() {
+    _driversPollTimer?.cancel();
+    _fetchAvailableDrivers();
+    _driversPollTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (mounted) {
+        _fetchAvailableDrivers();
+      }
+    });
+  }
+
+  void _stopDriversPolling() {
+    _driversPollTimer?.cancel();
+    _driversPollTimer = null;
+  }
+
+  Future<void> _fetchAvailableDrivers() async {
+    try {
+      final response = await ApiService.getDrivers();
+      final list = List<Map<String, dynamic>>.from(
+        (response["drivers"] as List<dynamic>? ?? const []).whereType<Map>(),
+      );
+      if (!mounted) return;
+      setState(() {
+        availableDrivers = list.where((d) => d["isAvailable"] == true).toList();
+      });
+    } catch (e) {
+      print("Error fetching online drivers: $e");
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _startDriversPolling();
+    SocketService.listenDriverLocationUpdated((data) {
+      if (!mounted) return;
+      final driverId = data["driverId"]?.toString();
+      final double? lat = data["lat"] is num ? (data["lat"] as num).toDouble() : double.tryParse("${data["lat"]}");
+      final double? lng = data["lng"] is num ? (data["lng"] as num).toDouble() : double.tryParse("${data["lng"]}");
+
+      if (driverId != null && lat != null && lng != null) {
+        setState(() {
+          final index = availableDrivers.indexWhere((d) => d["_id"]?.toString() == driverId);
+          if (index != -1) {
+            availableDrivers[index]["location"] = {"lat": lat, "lng": lng};
+          } else {
+            _fetchAvailableDrivers();
+          }
+        });
+      }
+    });
+  }
 
   bool get canSubmit {
     return !isLoading &&
@@ -544,9 +601,9 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.58),
+          color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFBFDBFE).withOpacity(0.65)),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
         ),
         child: const Row(
           children: [
@@ -600,6 +657,41 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
             color: Color(0xFFDC2626),
           ),
         ),
+      ...availableDrivers.map((driver) {
+        final loc = driver["location"];
+        final double? lat = loc != null && loc["lat"] is num
+            ? (loc["lat"] as num).toDouble()
+            : (loc != null && loc["lat"] is String ? double.tryParse(loc["lat"]) : null);
+        final double? lng = loc != null && loc["lng"] is num
+            ? (loc["lng"] as num).toDouble()
+            : (loc != null && loc["lng"] is String ? double.tryParse(loc["lng"]) : null);
+        if (lat == null || lng == null) return const Marker(point: LatLng(0, 0), child: SizedBox.shrink());
+
+        return Marker(
+          point: LatLng(lat, lng),
+          width: 40,
+          height: 40,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.25),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+              border: Border.all(color: AppPalette.primary, width: 2.2),
+            ),
+            child: const Icon(
+              Icons.directions_bike_rounded,
+              color: AppPalette.primary,
+              size: 20,
+            ),
+          ),
+        );
+      }).where((m) => m.point.latitude != 0.0),
     ];
 
     return SizedBox(
@@ -641,7 +733,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                   vertical: 7,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.84),
+                  color: Colors.black.withOpacity(0.6),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: const Row(
@@ -864,8 +956,13 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     } catch (e) {
       if (!mounted) return;
 
+      String errMessage = e.toString().replaceFirst("Exception: ", "");
+      if (errMessage.toLowerCase().contains("no drivers available")) {
+        errMessage = "No drivers are currently available. Please try again later.";
+      }
+
       setState(() {
-        message = e.toString().replaceFirst("Exception: ", "");
+        message = errMessage;
       });
     } finally {
       if (!mounted) return;
@@ -878,6 +975,8 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
 
   @override
   void dispose() {
+    _stopDriversPolling();
+    SocketService.stopListeningDriverLocationUpdated();
     pickupDebounce?.cancel();
     dropDebounce?.cancel();
     pickupController.dispose();
@@ -931,6 +1030,85 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
+                    if (pickupAddress != null || dropAddress != null) ...[
+                      const Text(
+                        "Selected Locations",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppPalette.slate700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (pickupAddress != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF16A34A).withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.18)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.my_location_rounded, color: Color(0xFF16A34A), size: 22),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "Pickup Point",
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      pickupAddress!,
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppPalette.slate900),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      if (dropAddress != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDC2626).withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFDC2626).withOpacity(0.18)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.flag_rounded, color: Color(0xFFDC2626), size: 22),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "Drop Point",
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      dropAddress!,
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppPalette.slate900),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      const Divider(),
+                      const SizedBox(height: 16),
+                    ],
                     _buildLocationSearchField(
                       label: "Pickup Location",
                       hintText: "Start typing pickup address",
@@ -1166,13 +1344,13 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              const Color(0xFFDBEAFE).withOpacity(0.55),
-                              Colors.white.withOpacity(0.72),
+                              Colors.white.withOpacity(0.06),
+                              Colors.white.withOpacity(0.02),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(
-                            color: const Color(0xFFBFDBFE).withOpacity(0.7),
+                            color: Colors.white.withOpacity(0.08),
                           ),
                         ),
                         child: Row(
