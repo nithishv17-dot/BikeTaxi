@@ -52,16 +52,17 @@ class _LoginScreenState extends State<LoginScreen> {
           response["token"] != null &&
           response["userId"] != null) {
         ApiService.token = response["token"];
+        final userRole = response["role"]?.toString() ?? (isDriver ? "driver" : "user");
         SessionService.saveSession(
           response["token"],
           response["userId"],
-          isDriver ? "driver" : "user",
+          userRole,
           name: response["name"]?.toString(),
           phone: response["phone"]?.toString(),
         );
         if (!mounted) return;
 
-        if (isDriver) {
+        if (userRole == "driver") {
           try {
             await ApiService.toggleDriver(response["userId"], isAvailable: true);
           } catch (e) {
@@ -209,20 +210,28 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     Navigator.pop(context); // Close connecting dialog
 
-    final mockPhone = isDriver ? "8888888888" : "9999999999";
-    final mockName = selectedEmail.startsWith("nithish") ? "Nithish Kumar (Google)" : "Guest User (Google)";
+    final mockPhone = selectedEmail;
+    final mockName = selectedEmail.split("@").first
+        .replaceAll(RegExp(r'[._-]'), ' ')
+        .split(' ')
+        .map((s) => s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : '')
+        .join(' ') + " (Google)";
     const mockPassword = "google-sign-in-password-auth";
 
     try {
       Map<String, dynamic> loginResponse;
+      String actualRole = isDriver ? "driver" : "user";
+
       try {
         loginResponse = await ApiService.login(
           mockPhone,
           mockPassword,
           role: isDriver ? "driver" : "user",
         );
+        actualRole = loginResponse["role"]?.toString() ?? actualRole;
       } catch (loginErr) {
-        if (loginErr.toString().contains("User not found")) {
+        final errStr = loginErr.toString();
+        if (errStr.contains("User not found")) {
           await ApiService.register(
             mockName,
             mockPhone,
@@ -234,6 +243,14 @@ class _LoginScreenState extends State<LoginScreen> {
             mockPassword,
             role: isDriver ? "driver" : "user",
           );
+          actualRole = loginResponse["role"]?.toString() ?? actualRole;
+        } else if (errStr.contains("This account is not a driver account")) {
+          loginResponse = await ApiService.login(
+            mockPhone,
+            mockPassword,
+            role: "user",
+          );
+          actualRole = "user";
         } else {
           rethrow;
         }
@@ -246,13 +263,13 @@ class _LoginScreenState extends State<LoginScreen> {
         SessionService.saveSession(
           loginResponse["token"],
           loginResponse["userId"],
-          isDriver ? "driver" : "user",
+          actualRole,
           name: loginResponse["name"]?.toString(),
           phone: loginResponse["phone"]?.toString(),
         );
         if (!mounted) return;
 
-        if (isDriver) {
+        if (actualRole == "driver") {
           try {
             await ApiService.toggleDriver(loginResponse["userId"], isAvailable: true);
           } catch (e) {
