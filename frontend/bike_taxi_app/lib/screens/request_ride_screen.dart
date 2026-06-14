@@ -54,6 +54,10 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
   String? dropError;
   String message = "";
   bool isLoading = false;
+  bool isResolvingCurrentLocation = false;
+  String? currentLocationMessage;
+  double? currentLat;
+  double? currentLng;
 
   List<Map<String, dynamic>> availableDrivers = [];
   Timer? _driversPollTimer;
@@ -92,6 +96,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
   void initState() {
     super.initState();
     _startDriversPolling();
+    _loadCurrentLocation();
     SocketService.listenDriverLocationUpdated((data) {
       if (!mounted) return;
       final driverId = data["driverId"]?.toString();
@@ -108,6 +113,32 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
           }
         });
       }
+    });
+  }
+
+  Future<void> _loadCurrentLocation() async {
+    if (isResolvingCurrentLocation) return;
+
+    setState(() {
+      isResolvingCurrentLocation = true;
+      currentLocationMessage = "Getting your live location...";
+    });
+
+    final pos = await LocationService.getCurrentPosition();
+
+    if (!mounted) return;
+
+    setState(() {
+      isResolvingCurrentLocation = false;
+      if (pos == null) {
+        currentLocationMessage =
+            "Unable to read your live location. Please allow location access.";
+        return;
+      }
+
+      currentLat = pos["lat"];
+      currentLng = pos["lng"];
+      currentLocationMessage = null;
     });
   }
 
@@ -392,6 +423,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     required bool isSearching,
     required String? errorText,
     required IconData icon,
+    required bool hasSelectedLocation,
   }) {
     return TextField(
       controller: controller,
@@ -399,7 +431,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
-        helperText: helperText,
+        helperText: hasSelectedLocation ? null : helperText,
         errorText: errorText,
         prefixIcon: Icon(icon),
         suffixIcon: isSearching
@@ -597,31 +629,208 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     ];
 
     if (previewPoints.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.map_outlined, color: Color(0xFF64748B)),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                "Search and select pickup and drop locations to preview them on the map.",
-                style: TextStyle(
-                  color: Color(0xFF64748B),
-                  fontWeight: FontWeight.w600,
+      final currentLocationPoint =
+          currentLat != null && currentLng != null
+              ? LatLng(currentLat!, currentLng!)
+              : null;
+
+      if (currentLocationPoint != null) {
+        return SizedBox(
+          height: 240,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              children: [
+                FlutterMap(
+                  options: MapOptions(
+                    initialCenter: currentLocationPoint,
+                    initialZoom: 14,
+                    onTap: (tapPosition, point) => _onMapTapped(point),
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                      userAgentPackageName: "com.example.bike_taxi_app",
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: currentLocationPoint,
+                          width: 52,
+                          height: 52,
+                          child: const Icon(
+                            Icons.my_location_rounded,
+                            size: 38,
+                            color: Color(0xFF16A34A),
+                          ),
+                        ),
+                        ...availableDrivers.map((driver) {
+                          final loc = driver["location"];
+                          final double? lat = loc != null && loc["lat"] is num
+                              ? (loc["lat"] as num).toDouble()
+                              : (loc != null && loc["lat"] is String
+                                  ? double.tryParse(loc["lat"])
+                                  : null);
+                          final double? lng = loc != null && loc["lng"] is num
+                              ? (loc["lng"] as num).toDouble()
+                              : (loc != null && loc["lng"] is String
+                                  ? double.tryParse(loc["lng"])
+                                  : null);
+                          if (lat == null || lng == null) {
+                            return const Marker(
+                              point: LatLng(0, 0),
+                              child: SizedBox.shrink(),
+                            );
+                          }
+
+                          return Marker(
+                            point: LatLng(lat, lng),
+                            width: 40,
+                            height: 40,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.25),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                                border: Border.all(
+                                  color: AppPalette.primary,
+                                  width: 2.2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.directions_bike_rounded,
+                                color: AppPalette.primary,
+                                size: 20,
+                              ),
+                            ),
+                          );
+                        }).where((m) => m.point.latitude != 0.0),
+                      ],
+                    ),
+                  ],
+                ),
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.alt_route_rounded,
+                          size: 15,
+                          color: AppPalette.slate600,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          "Live route preview",
+                          style: TextStyle(
+                            color: AppPalette.slate600,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 12,
+                  bottom: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Text(
+                      "Centered on your live location",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      if (isResolvingCurrentLocation) {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
+          ),
+          child: const Row(
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  "Loading your live location for the map preview...",
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-      );
-    }
+            ],
+          ),
+        );
+      }
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.map_outlined, color: Color(0xFF64748B)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  currentLocationMessage ??
+                      "Enable location access so the preview starts from your live position.",
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
 
     final linePoints = previewPoints.length == 2
         ? [previewPoints.first, previewPoints.last]
@@ -1040,89 +1249,85 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                       isSearching: isSearchingPickup,
                       errorText: pickupError,
                       icon: Icons.my_location_rounded,
+                      hasSelectedLocation: pickupAddress != null,
                     ),
-                    const SizedBox(height: 8),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          const Text("Quick: ",
+                    if (pickupAddress == null) ...[
+                      const SizedBox(height: 8),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            const Text(
+                              "Quick: ",
                               style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppPalette.slate500)),
-                          const SizedBox(width: 4),
-                          ...[
-                            {
-                              "name": "Current Location",
-                              "useGPS": true,
-                            },
-                            {
-                              "name": "Tech Park Gate 1",
-                              "address": "Manyata Tech Park Gate 1, Bangalore",
-                              "lat": 13.0451,
-                              "lng": 77.6266,
-                              "placeId": "techpark_gate1_preset"
-                            }
-                          ].map((preset) => Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: ActionChip(
-                                  avatar: Icon(
-                                    preset["useGPS"] == true
-                                        ? Icons.gps_fixed_rounded
-                                        : Icons.my_location_rounded,
-                                    size: 12,
-                                    color: AppPalette.primary,
-                                  ),
-                                  label: Text(preset["name"] as String,
-                                      style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold)),
-                                  padding: EdgeInsets.zero,
-                                  onPressed: () async {
-                                    if (preset["useGPS"] == true) {
-                                      setState(() {
-                                        message = "Getting your location...";
-                                      });
-                                      final pos = await LocationService
-                                          .getCurrentPosition();
-                                      if (!mounted) return;
-                                      if (pos != null) {
-                                        final label =
-                                            "My Location (${pos['lat']!.toStringAsFixed(5)}, ${pos['lng']!.toStringAsFixed(5)})";
-                                        _selectSuggestion({
-                                          "placeId": "gps_current_loc",
-                                          "address": label,
-                                          "lat": pos['lat'],
-                                          "lng": pos['lng'],
-                                        }, isPickup: true);
-                                        setState(() {
-                                          message =
-                                              "Pickup set to your current location";
-                                        });
-                                        _reverseGeocodeAndUpdate(
-                                            pos['lat']!, pos['lng']!,
-                                            isPickup: true);
-                                      } else {
-                                        setState(() {
-                                          message =
-                                              "Could not get your location. Please allow location access.";
-                                        });
-                                      }
-                                    } else {
-                                      _selectSuggestion({
-                                        "placeId": preset["placeId"],
-                                        "address": preset["address"],
-                                        "lat": preset["lat"],
-                                        "lng": preset["lng"],
-                                      }, isPickup: true);
-                                    }
-                                  },
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppPalette.slate500,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ActionChip(
+                                avatar: Icon(
+                                  isResolvingCurrentLocation
+                                      ? Icons.hourglass_top_rounded
+                                      : Icons.gps_fixed_rounded,
+                                  size: 12,
+                                  color: AppPalette.primary,
                                 ),
-                              )),
-                        ],
+                                label: Text(
+                                  isResolvingCurrentLocation
+                                      ? "Locating..."
+                                      : "Use Live Location",
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                padding: EdgeInsets.zero,
+                                onPressed: isResolvingCurrentLocation
+                                    ? null
+                                    : () async {
+                                        setState(() {
+                                          message = "Getting your location...";
+                                        });
+                                        final pos = await LocationService
+                                            .getCurrentPosition();
+                                        if (!mounted) return;
+                                        if (pos != null) {
+                                          final label =
+                                              "My Location (${pos['lat']!.toStringAsFixed(5)}, ${pos['lng']!.toStringAsFixed(5)})";
+                                          _selectSuggestion({
+                                            "placeId": "gps_current_loc",
+                                            "address": label,
+                                            "lat": pos['lat'],
+                                            "lng": pos['lng'],
+                                          }, isPickup: true);
+                                          setState(() {
+                                            currentLat = pos['lat'];
+                                            currentLng = pos['lng'];
+                                            message =
+                                                "Pickup set to your live location";
+                                          });
+                                          _reverseGeocodeAndUpdate(
+                                            pos['lat']!,
+                                            pos['lng']!,
+                                            isPickup: true,
+                                          );
+                                        } else {
+                                          setState(() {
+                                            message =
+                                                "Could not get your location. Please allow location access.";
+                                          });
+                                        }
+                                      },
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                     _buildSuggestionsList(pickupSuggestions, isPickup: true),
                     const SizedBox(height: 15),
                     _buildLocationSearchField(
@@ -1135,73 +1340,85 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                       isSearching: isSearchingDrop,
                       errorText: dropError,
                       icon: Icons.flag_rounded,
+                      hasSelectedLocation: dropAddress != null,
                     ),
-                    const SizedBox(height: 8),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          const Text("Quick: ",
+                    if (dropAddress == null) ...[
+                      const SizedBox(height: 8),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            const Text(
+                              "Quick: ",
                               style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppPalette.slate500)),
-                          const SizedBox(width: 4),
-                          ...[
-                            {
-                              "name": "Home",
-                              "address":
-                                  "123 Green Glen Layout, Outer Ring Road, Bangalore",
-                              "lat": 12.9279,
-                              "lng": 77.6271,
-                              "placeId": "home_preset"
-                            },
-                            {
-                              "name": "Office",
-                              "address":
-                                  "Embassy TechVillage, Bellandur, Bangalore",
-                              "lat": 12.9784,
-                              "lng": 77.6408,
-                              "placeId": "office_preset"
-                            },
-                            {
-                              "name": "Metro Station",
-                              "address": "Indiranagar Metro Station, Bangalore",
-                              "lat": 12.9716,
-                              "lng": 77.5946,
-                              "placeId": "metro_preset"
-                            },
-                            {
-                              "name": "Airport",
-                              "address":
-                                  "Kempegowda International Airport, Bangalore",
-                              "lat": 13.1986,
-                              "lng": 77.7066,
-                              "placeId": "airport_preset"
-                            }
-                          ].map((preset) => Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: ActionChip(
-                                  avatar: const Icon(Icons.place_rounded,
-                                      size: 12, color: AppPalette.accent),
-                                  label: Text(preset["name"] as String,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppPalette.slate500,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            ...[
+                              {
+                                "name": "Home",
+                                "address":
+                                    "123 Green Glen Layout, Outer Ring Road, Bangalore",
+                                "lat": 12.9279,
+                                "lng": 77.6271,
+                                "placeId": "home_preset"
+                              },
+                              {
+                                "name": "Office",
+                                "address":
+                                    "Embassy TechVillage, Bellandur, Bangalore",
+                                "lat": 12.9784,
+                                "lng": 77.6408,
+                                "placeId": "office_preset"
+                              },
+                              {
+                                "name": "Metro Station",
+                                "address": "Indiranagar Metro Station, Bangalore",
+                                "lat": 12.9716,
+                                "lng": 77.5946,
+                                "placeId": "metro_preset"
+                              },
+                              {
+                                "name": "Airport",
+                                "address":
+                                    "Kempegowda International Airport, Bangalore",
+                                "lat": 13.1986,
+                                "lng": 77.7066,
+                                "placeId": "airport_preset"
+                              }
+                            ].map((preset) => Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: ActionChip(
+                                    avatar: const Icon(
+                                      Icons.place_rounded,
+                                      size: 12,
+                                      color: AppPalette.accent,
+                                    ),
+                                    label: Text(
+                                      preset["name"] as String,
                                       style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold)),
-                                  padding: EdgeInsets.zero,
-                                  onPressed: () {
-                                    _selectSuggestion({
-                                      "placeId": preset["placeId"],
-                                      "address": preset["address"],
-                                      "lat": preset["lat"],
-                                      "lng": preset["lng"],
-                                    }, isPickup: false);
-                                  },
-                                ),
-                              )),
-                        ],
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                    onPressed: () {
+                                      _selectSuggestion({
+                                        "placeId": preset["placeId"],
+                                        "address": preset["address"],
+                                        "lat": preset["lat"],
+                                        "lng": preset["lng"],
+                                      }, isPickup: false);
+                                    },
+                                  ),
+                                )),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                     _buildSuggestionsList(dropSuggestions, isPickup: false),
                     const SizedBox(height: 20),
                     const Text(

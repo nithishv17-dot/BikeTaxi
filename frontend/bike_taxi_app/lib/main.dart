@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/driver_screen.dart';
-import 'screens/ride_status_screen.dart';
 import 'services/api_service.dart';
 import 'services/session_service.dart';
 import 'services/socket_service.dart';
@@ -158,33 +157,7 @@ class _SessionInitPageState extends State<SessionInitPage> {
   @override
   void initState() {
     super.initState();
-    _checkActiveRide();
-  }
-
-  Future<void> _checkActiveRide() async {
-    try {
-      final response = await ApiService.getActiveRide();
-      final activeRide = response["ride"] is Map ? response["ride"] : null;
-      if (!mounted) return;
-
-      if (activeRide != null) {
-        final rideId = activeRide["_id"]?.toString() ?? "";
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => RideStatusScreen(
-              rideId: rideId,
-              isDriver: widget.role == "driver",
-            ),
-          ),
-        );
-      } else {
-        _goToHome();
-      }
-    } catch (e) {
-      print("Error checking active ride: $e");
-      _goToHome();
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _goToHome());
   }
 
   void _goToHome() {
