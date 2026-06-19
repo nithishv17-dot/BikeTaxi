@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
 import '../theme/premium_ui.dart';
+import '../utils/location_display.dart';
 import 'ride_status_screen.dart';
 
 class DriverNegotiationScreen extends StatefulWidget {
@@ -52,7 +53,8 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => RideStatusScreen(rideId: rideId, isDriver: true),
+          builder: (context) =>
+              RideStatusScreen(rideId: rideId, isDriver: true),
         ),
       );
     } else {
@@ -146,7 +148,8 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
 
       if (!mounted) return;
 
-      final responseMessage = response["message"]?.toString() ??
+      final responseMessage =
+          response["message"]?.toString() ??
           (acceptBaseFare
               ? "Base fare accepted successfully"
               : "Offer submitted successfully");
@@ -156,9 +159,9 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
         controller.clear();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(responseMessage)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(responseMessage)));
 
       await fetchNegotiationRides();
     } catch (e) {
@@ -170,9 +173,9 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
         message = errorMessage;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorMessage)));
     } finally {
       if (mounted) {
         setState(() {
@@ -196,7 +199,8 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
       orElse: () => <String, dynamic>{},
     );
 
-    final hasPendingOffer = existingOffer.isNotEmpty &&
+    final hasPendingOffer =
+        existingOffer.isNotEmpty &&
         (existingOffer["status"] == "pending" ||
             existingOffer["status"] == "accepted_base");
 
@@ -219,7 +223,10 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
               ),
               if (hasPendingOffer)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: AppPalette.sky500.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -239,11 +246,19 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
           // Route Details
           Row(
             children: [
-              const Icon(Icons.circle_outlined, size: 14, color: AppPalette.primary),
+              const Icon(
+                Icons.circle_outlined,
+                size: 14,
+                color: AppPalette.primary,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  ride["pickupAddress"] ?? ride["pickup"] ?? "N/A",
+                  readableLocationLabel(
+                    ride["pickupAddress"]?.toString() ??
+                        ride["pickup"]?.toString(),
+                    fallback: "Selected Pickup Location",
+                  ),
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     color: AppPalette.slate900,
@@ -256,16 +271,28 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
             padding: EdgeInsets.only(left: 6),
             child: SizedBox(
               height: 14,
-              child: VerticalDivider(thickness: 1.5, width: 2, color: AppPalette.slate500),
+              child: VerticalDivider(
+                thickness: 1.5,
+                width: 2,
+                color: AppPalette.slate500,
+              ),
             ),
           ),
           Row(
             children: [
-              const Icon(Icons.location_on_rounded, size: 14, color: Color(0xFFEF4444)),
+              const Icon(
+                Icons.location_on_rounded,
+                size: 14,
+                color: Color(0xFFEF4444),
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  ride["dropAddress"] ?? ride["destination"] ?? "N/A",
+                  readableLocationLabel(
+                    ride["dropAddress"]?.toString() ??
+                        ride["destination"]?.toString(),
+                    fallback: "Selected Drop Location",
+                  ),
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     color: AppPalette.slate900,
@@ -294,7 +321,11 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.hourglass_top_rounded, color: Color(0xFF2563EB), size: 18),
+                  const Icon(
+                    Icons.hourglass_top_rounded,
+                    color: Color(0xFF2563EB),
+                    size: 18,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -342,9 +373,7 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
                     onPressed: (rideId.isEmpty || isSubmitting)
                         ? null
                         : () => submitOffer(rideId, acceptBaseFare: true),
-                    child: Text(
-                      isSubmitting ? "Processing..." : "Accept Base",
-                    ),
+                    child: Text(isSubmitting ? "Processing..." : "Accept Base"),
                   ),
                 ),
               ],
@@ -411,17 +440,23 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      
+
                       // Status / Error message
                       if (message.isNotEmpty) ...[
                         RevealMotion(
                           delay: Duration.zero,
                           child: ReflectionCard(
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 14,
+                            ),
                             tintColor: const Color(0xFFEFF6FF),
                             child: Row(
                               children: [
-                                const Icon(Icons.info_outline_rounded, color: AppPalette.primary),
+                                const Icon(
+                                  Icons.info_outline_rounded,
+                                  color: AppPalette.primary,
+                                ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(

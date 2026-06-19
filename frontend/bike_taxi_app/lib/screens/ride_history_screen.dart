@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme/premium_ui.dart';
+import '../utils/location_display.dart';
 
 class RideHistoryScreen extends StatefulWidget {
   final String userId;
@@ -81,16 +82,14 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
   }
 
   Widget buildRideCard(Map<String, dynamic> ride) {
-    final pickup =
-        ride["pickupAddress"]?.toString() ?? ride["pickup"]?.toString() ?? "";
-    final destination =
-        ride["dropAddress"]?.toString() ??
-        ride["destination"]?.toString() ??
-        "";
-    final pickupCoords =
-        "${ride["pickupLat"] ?? "N/A"}, ${ride["pickupLng"] ?? "N/A"}";
-    final dropCoords =
-        "${ride["dropLat"] ?? ride["destinationLat"] ?? "N/A"}, ${ride["dropLng"] ?? ride["destinationLng"] ?? "N/A"}";
+    final pickup = readableLocationLabel(
+      ride["pickupAddress"]?.toString() ?? ride["pickup"]?.toString(),
+      fallback: "Selected Pickup Location",
+    );
+    final destination = readableLocationLabel(
+      ride["dropAddress"]?.toString() ?? ride["destination"]?.toString(),
+      fallback: "Selected Drop Location",
+    );
     final status = ride["status"]?.toString() ?? "";
     final initialFare = ride["initialFare"]?.toString() ?? "N/A";
     final offeredFare = ride["offeredFare"]?.toString() ?? "N/A";
@@ -186,10 +185,6 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                   Text("Offered Fare: $offeredFare"),
                   const SizedBox(height: 6),
                   Text("Payment Method: $paymentMethod"),
-                  const SizedBox(height: 6),
-                  Text("Pickup Coords: $pickupCoords"),
-                  const SizedBox(height: 6),
-                  Text("Drop Coords: $dropCoords"),
                   const SizedBox(height: 6),
                   Text("Driver: $driverName"),
                   const SizedBox(height: 6),

@@ -6,6 +6,7 @@ import '../services/location_service.dart';
 import '../services/session_service.dart';
 import '../services/socket_service.dart';
 import '../theme/premium_ui.dart';
+import '../utils/location_display.dart';
 import 'driver_negotiation_screen.dart';
 import 'ride_status_screen.dart';
 import 'login_screen.dart';
@@ -94,9 +95,12 @@ class _DriverScreenState extends State<DriverScreen> {
         orElse: () => <String, dynamic>{},
       );
 
-      final requestsResponse = await ApiService.getDriverRequests(widget.driverId);
+      final requestsResponse = await ApiService.getDriverRequests(
+        widget.driverId,
+      );
       final fetchedRequests = List<Map<String, dynamic>>.from(
-        (requestsResponse["rides"] as List<dynamic>? ?? const []).whereType<Map>(),
+        (requestsResponse["rides"] as List<dynamic>? ?? const [])
+            .whereType<Map>(),
       );
 
       if (!mounted) return;
@@ -142,19 +146,21 @@ class _DriverScreenState extends State<DriverScreen> {
 
       if (!mounted) return;
 
-      final successMessage = response["message"]?.toString() ??
+      final successMessage =
+          response["message"]?.toString() ??
           "Ride request accepted successfully";
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(successMessage)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(successMessage)));
 
       _loadDriverStatus();
 
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => RideStatusScreen(rideId: rideId, isDriver: true),
+          builder: (context) =>
+              RideStatusScreen(rideId: rideId, isDriver: true),
         ),
       );
     } catch (e) {
@@ -166,9 +172,9 @@ class _DriverScreenState extends State<DriverScreen> {
         message = errorMessage;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorMessage)));
     } finally {
       if (mounted) {
         setState(() {
@@ -198,9 +204,9 @@ class _DriverScreenState extends State<DriverScreen> {
             : "You are now offline and not accepting rides.";
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
 
       await _loadDriverStatus();
     } catch (e) {
@@ -212,9 +218,9 @@ class _DriverScreenState extends State<DriverScreen> {
         message = errorMessage;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorMessage)));
     } finally {
       if (mounted) {
         setState(() {
@@ -241,7 +247,10 @@ class _DriverScreenState extends State<DriverScreen> {
             ),
             if (directRequests.isNotEmpty)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppPalette.primary,
                   borderRadius: BorderRadius.circular(12),
@@ -264,7 +273,11 @@ class _DriverScreenState extends State<DriverScreen> {
             child: Center(
               child: Column(
                 children: [
-                  Icon(Icons.directions_bike_rounded, color: AppPalette.slate300, size: 48),
+                  Icon(
+                    Icons.directions_bike_rounded,
+                    color: AppPalette.slate300,
+                    size: 48,
+                  ),
                   SizedBox(height: 12),
                   Text(
                     "No Active Ride Requests",
@@ -278,10 +291,7 @@ class _DriverScreenState extends State<DriverScreen> {
                   Text(
                     "You will see passenger requests here when they book.",
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppPalette.slate500,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: AppPalette.slate500, fontSize: 13),
                   ),
                 ],
               ),
@@ -294,8 +304,15 @@ class _DriverScreenState extends State<DriverScreen> {
             final rideId = ride["_id"]?.toString() ?? "";
             final riderName = ride["userId"]?["name"] ?? "Passenger";
             final riderPhone = ride["userId"]?["phone"] ?? "N/A";
-            final pickup = ride["pickupAddress"] ?? ride["pickup"] ?? "";
-            final drop = ride["dropAddress"] ?? ride["destination"] ?? "";
+            final pickup = readableLocationLabel(
+              ride["pickupAddress"]?.toString() ?? ride["pickup"]?.toString(),
+              fallback: "Selected Pickup Location",
+            );
+            final drop = readableLocationLabel(
+              ride["dropAddress"]?.toString() ??
+                  ride["destination"]?.toString(),
+              fallback: "Selected Drop Location",
+            );
             final fare = ride["estimatedFare"] ?? 0;
             final otpController = _otpControllerForRide(rideId);
 
@@ -359,7 +376,11 @@ class _DriverScreenState extends State<DriverScreen> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.location_on_rounded, color: Colors.green, size: 18),
+                          const Icon(
+                            Icons.location_on_rounded,
+                            color: Colors.green,
+                            size: 18,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -377,7 +398,11 @@ class _DriverScreenState extends State<DriverScreen> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.location_on_rounded, color: Colors.red, size: 18),
+                          const Icon(
+                            Icons.location_on_rounded,
+                            color: Colors.red,
+                            size: 18,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -453,11 +478,17 @@ class _DriverScreenState extends State<DriverScreen> {
                         width: 10,
                         height: 10,
                         decoration: BoxDecoration(
-                          color: isAvailable ? AppPalette.secondary : const Color(0xFFEF4444),
+                          color: isAvailable
+                              ? AppPalette.secondary
+                              : const Color(0xFFEF4444),
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: (isAvailable ? AppPalette.secondary : const Color(0xFFEF4444)).withOpacity(0.4),
+                              color:
+                                  (isAvailable
+                                          ? AppPalette.secondary
+                                          : const Color(0xFFEF4444))
+                                      .withOpacity(0.4),
                               blurRadius: 8,
                               spreadRadius: 2,
                             ),
@@ -467,7 +498,9 @@ class _DriverScreenState extends State<DriverScreen> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          isAvailable ? "You are Online & Accepting Rides" : "You are Offline",
+                          isAvailable
+                              ? "You are Online & Accepting Rides"
+                              : "You are Offline",
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -481,7 +514,7 @@ class _DriverScreenState extends State<DriverScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Status Toggle Card
           RevealMotion(
             delay: const Duration(milliseconds: 160),
@@ -505,7 +538,9 @@ class _DriverScreenState extends State<DriverScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              isAvailable ? "Go offline to take a break" : "Go online to receive rides",
+                              isAvailable
+                                  ? "Go offline to take a break"
+                                  : "Go online to receive rides",
                               style: const TextStyle(
                                 color: AppPalette.slate500,
                                 fontWeight: FontWeight.w600,
@@ -551,7 +586,11 @@ class _DriverScreenState extends State<DriverScreen> {
                       color: const Color(0xFF7C3AED).withOpacity(0.14),
                       borderRadius: BorderRadius.circular(18),
                     ),
-                    child: const Icon(Icons.handshake_rounded, color: Color(0xFF7C3AED), size: 28),
+                    child: const Icon(
+                      Icons.handshake_rounded,
+                      color: Color(0xFF7C3AED),
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   const Expanded(
@@ -589,18 +628,24 @@ class _DriverScreenState extends State<DriverScreen> {
           ),
           const SizedBox(height: 24),
           _buildRequestsSection(),
-          
+
           // Status Message Box (if present)
           if (message.isNotEmpty) ...[
             const SizedBox(height: 16),
             RevealMotion(
               delay: Duration.zero,
               child: ReflectionCard(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
                 tintColor: const Color(0xFFEFF6FF),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded, color: AppPalette.primary),
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: AppPalette.primary,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -624,7 +669,11 @@ class _DriverScreenState extends State<DriverScreen> {
   Widget _buildProfileTab() {
     final name = driverName.isNotEmpty ? driverName : "Captain";
     final phone = driverPhone.isNotEmpty ? driverPhone : "N/A";
-    final initials = name.split(" ").map((s) => s.isNotEmpty ? s[0] : "").join().toUpperCase();
+    final initials = name
+        .split(" ")
+        .map((s) => s.isNotEmpty ? s[0] : "")
+        .join()
+        .toUpperCase();
 
     return Center(
       child: ConstrainedBox(
@@ -635,7 +684,10 @@ class _DriverScreenState extends State<DriverScreen> {
             RevealMotion(
               delay: const Duration(milliseconds: 60),
               child: ReflectionCard(
-                padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 32,
+                  horizontal: 20,
+                ),
                 child: Column(
                   children: [
                     CircleAvatar(
@@ -671,7 +723,10 @@ class _DriverScreenState extends State<DriverScreen> {
                     ),
                     const SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: AppPalette.primary.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(20),
@@ -700,7 +755,10 @@ class _DriverScreenState extends State<DriverScreen> {
                     message = "Logging out...";
                   });
                   try {
-                    await ApiService.toggleDriver(widget.driverId, isAvailable: false);
+                    await ApiService.toggleDriver(
+                      widget.driverId,
+                      isAvailable: false,
+                    );
                   } catch (e) {
                     print("Error setting driver offline on logout: $e");
                   }
@@ -708,7 +766,9 @@ class _DriverScreenState extends State<DriverScreen> {
                   if (!mounted) return;
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(),
+                    ),
                   );
                 },
                 style: ElevatedButton.styleFrom(
@@ -723,10 +783,7 @@ class _DriverScreenState extends State<DriverScreen> {
                 icon: const Icon(Icons.logout_rounded),
                 label: const Text(
                   "Log Out",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                 ),
               ),
             ),
@@ -755,10 +812,7 @@ class _DriverScreenState extends State<DriverScreen> {
         child: SafeArea(
           child: IndexedStack(
             index: _currentIndex,
-            children: [
-              _buildDashboardTab(),
-              _buildProfileTab(),
-            ],
+            children: [_buildDashboardTab(), _buildProfileTab()],
           ),
         ),
       ),
@@ -786,12 +840,18 @@ class _DriverScreenState extends State<DriverScreen> {
             destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.dashboard_rounded, color: AppPalette.slate500),
-                selectedIcon: Icon(Icons.dashboard_rounded, color: AppPalette.primary),
+                selectedIcon: Icon(
+                  Icons.dashboard_rounded,
+                  color: AppPalette.primary,
+                ),
                 label: "Dashboard",
               ),
               NavigationDestination(
                 icon: Icon(Icons.person_rounded, color: AppPalette.slate500),
-                selectedIcon: Icon(Icons.person_rounded, color: AppPalette.primary),
+                selectedIcon: Icon(
+                  Icons.person_rounded,
+                  color: AppPalette.primary,
+                ),
                 label: "Profile",
               ),
             ],

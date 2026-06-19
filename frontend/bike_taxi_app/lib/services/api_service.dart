@@ -39,21 +39,22 @@ class ApiService {
         "Content-Type": "application/json",
         "Bypass-Tunnel-Reminder": "true",
       },
-      body: jsonEncode({
-        "phone": phone,
-        "password": password,
-        "role": role,
-      }),
+      body: jsonEncode({"phone": phone, "password": password, "role": role}),
     );
 
     return _handleResponse(response);
   }
 
-  static Future<Map<String, dynamic>> toggleDriver(String driverId, {bool? isAvailable}) async {
+  static Future<Map<String, dynamic>> toggleDriver(
+    String driverId, {
+    bool? isAvailable,
+  }) async {
     final response = await http.post(
       Uri.parse("$baseUrl/drivers/toggle/$driverId"),
       headers: _authHeaders(),
-      body: isAvailable != null ? jsonEncode({"isAvailable": isAvailable}) : null,
+      body: isAvailable != null
+          ? jsonEncode({"isAvailable": isAvailable})
+          : null,
     );
 
     return _handleResponse(response);
@@ -90,7 +91,10 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  static Future<Map<String, dynamic>> updateLocation(double lat, double lng) async {
+  static Future<Map<String, dynamic>> updateLocation(
+    double lat,
+    double lng,
+  ) async {
     final response = await http.post(
       Uri.parse("$baseUrl/users/location"),
       headers: _authHeaders(),
@@ -134,62 +138,84 @@ class ApiService {
       "${photonBaseUrl}?q=${Uri.encodeQueryComponent(input.trim())}&limit=5",
     );
 
-    final response = await http.get(
-      uri,
-      headers: _locationHeaders(),
+    final response = await http.get(uri, headers: _locationHeaders());
+
+    return _parsePhotonFeatures(_handleResponse(response));
+  }
+
+  static Future<Map<String, dynamic>?> reversePhotonPlace(
+    double lat,
+    double lng,
+  ) async {
+    final baseUri = Uri.parse(photonBaseUrl);
+    final reversePath = baseUri.path.replaceFirst(
+      RegExp(r'/api/?$'),
+      '/reverse',
+    );
+    final uri = baseUri.replace(
+      path: reversePath,
+      queryParameters: {
+        "lat": lat.toString(),
+        "lon": lng.toString(),
+        "limit": "1",
+      },
     );
 
-    final data = _handleResponse(response);
+    final response = await http.get(uri, headers: _locationHeaders());
+
+    final results = _parsePhotonFeatures(_handleResponse(response));
+    return results.isEmpty ? null : results.first;
+  }
+
+  static List<Map<String, dynamic>> _parsePhotonFeatures(dynamic data) {
     final features = data is Map<String, dynamic>
         ? List<dynamic>.from(data["features"] ?? const [])
         : <dynamic>[];
 
     return features
         .whereType<Map>()
-        .map(
-          (item) {
-            final feature = Map<String, dynamic>.from(item);
-            final geometry = Map<String, dynamic>.from(
-              feature["geometry"] as Map? ?? const {},
-            );
-            final properties = Map<String, dynamic>.from(
-              feature["properties"] as Map? ?? const {},
-            );
-            final coordinates = geometry["coordinates"] is List
-                ? List<dynamic>.from(geometry["coordinates"] as List)
-                : const <dynamic>[];
-            final lng = coordinates.isNotEmpty
-                ? (coordinates[0] as num?)?.toDouble()
-                : null;
-            final lat = coordinates.length > 1
-                ? (coordinates[1] as num?)?.toDouble()
-                : null;
-            final addressParts = <String>[
-              properties["name"]?.toString() ?? "",
-              properties["street"]?.toString() ?? "",
-              properties["city"]?.toString() ?? "",
-              properties["state"]?.toString() ?? "",
-              properties["country"]?.toString() ?? "",
-            ].where((part) => part.trim().isNotEmpty).toList();
-            final address = addressParts.isNotEmpty
-                ? addressParts.join(", ")
-                : (properties["name"]?.toString() ??
+        .map((item) {
+          final feature = Map<String, dynamic>.from(item);
+          final geometry = Map<String, dynamic>.from(
+            feature["geometry"] as Map? ?? const {},
+          );
+          final properties = Map<String, dynamic>.from(
+            feature["properties"] as Map? ?? const {},
+          );
+          final coordinates = geometry["coordinates"] is List
+              ? List<dynamic>.from(geometry["coordinates"] as List)
+              : const <dynamic>[];
+          final lng = coordinates.isNotEmpty
+              ? (coordinates[0] as num?)?.toDouble()
+              : null;
+          final lat = coordinates.length > 1
+              ? (coordinates[1] as num?)?.toDouble()
+              : null;
+          final addressParts = <String>[
+            properties["name"]?.toString() ?? "",
+            properties["street"]?.toString() ?? "",
+            properties["city"]?.toString() ?? "",
+            properties["state"]?.toString() ?? "",
+            properties["country"]?.toString() ?? "",
+          ].where((part) => part.trim().isNotEmpty).toList();
+          final address = addressParts.isNotEmpty
+              ? addressParts.join(", ")
+              : (properties["name"]?.toString() ??
                     properties["country"]?.toString() ??
                     "");
 
-            return {
-              "placeId":
-                  "${properties["osm_type"] ?? "feature"}-${properties["osm_id"] ?? feature["id"] ?? ""}",
-              "address": address,
-              "subtitle": [
-                properties["postcode"]?.toString() ?? "",
-                properties["district"]?.toString() ?? "",
-              ].where((part) => part.trim().isNotEmpty).join(" • "),
-              "lat": lat,
-              "lng": lng,
-            };
-          },
-        )
+          return {
+            "placeId":
+                "${properties["osm_type"] ?? "feature"}-${properties["osm_id"] ?? feature["id"] ?? ""}",
+            "address": address,
+            "subtitle": [
+              properties["postcode"]?.toString() ?? "",
+              properties["district"]?.toString() ?? "",
+            ].where((part) => part.trim().isNotEmpty).join(" • "),
+            "lat": lat,
+            "lng": lng,
+          };
+        })
         .where(
           (item) =>
               item["placeId"] != "feature-" &&
@@ -273,9 +299,7 @@ class ApiService {
     final response = await http.post(
       Uri.parse("$baseUrl/rides/$rideId/confirm-offer"),
       headers: _authHeaders(),
-      body: jsonEncode({
-        "offerId": offerId,
-      }),
+      body: jsonEncode({"offerId": offerId}),
     );
 
     return _handleResponse(response);
@@ -319,7 +343,10 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  static Future<Map<String, dynamic>> startRide(String rideId, String otp) async {
+  static Future<Map<String, dynamic>> startRide(
+    String rideId,
+    String otp,
+  ) async {
     final response = await http.post(
       Uri.parse("$baseUrl/rides/start/$rideId"),
       headers: _authHeaders(),
@@ -363,9 +390,7 @@ class ApiService {
     final response = await http.post(
       Uri.parse("$baseUrl/rides/negotiate/$rideId"),
       headers: _authHeaders(),
-      body: jsonEncode({
-        "offeredFare": offeredFare,
-      }),
+      body: jsonEncode({"offeredFare": offeredFare}),
     );
 
     return _handleResponse(response);

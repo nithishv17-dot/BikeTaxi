@@ -9,6 +9,7 @@ import '../services/api_service.dart';
 import '../services/location_service.dart';
 import '../services/socket_service.dart';
 import '../theme/premium_ui.dart';
+import '../utils/location_display.dart';
 import 'ride_status_screen.dart';
 
 class RequestRideScreen extends StatefulWidget {
@@ -100,12 +101,18 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     SocketService.listenDriverLocationUpdated((data) {
       if (!mounted) return;
       final driverId = data["driverId"]?.toString();
-      final double? lat = data["lat"] is num ? (data["lat"] as num).toDouble() : double.tryParse("${data["lat"]}");
-      final double? lng = data["lng"] is num ? (data["lng"] as num).toDouble() : double.tryParse("${data["lng"]}");
+      final double? lat = data["lat"] is num
+          ? (data["lat"] as num).toDouble()
+          : double.tryParse("${data["lat"]}");
+      final double? lng = data["lng"] is num
+          ? (data["lng"] as num).toDouble()
+          : double.tryParse("${data["lng"]}");
 
       if (driverId != null && lat != null && lng != null) {
         setState(() {
-          final index = availableDrivers.indexWhere((d) => d["_id"]?.toString() == driverId);
+          final index = availableDrivers.indexWhere(
+            (d) => d["_id"]?.toString() == driverId,
+          );
           if (index != -1) {
             availableDrivers[index]["location"] = {"lat": lat, "lng": lng};
           } else {
@@ -368,7 +375,13 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     required bool isPickup,
   }) {
     final placeId = suggestion["placeId"]?.toString() ?? "";
-    final address = suggestion["address"]?.toString() ?? "";
+    final rawAddress = suggestion["address"]?.toString() ?? "";
+    final address = readableLocationLabel(
+      rawAddress,
+      fallback: isPickup
+          ? "Selected Pickup Location"
+          : "Selected Drop Location",
+    );
     final lat = suggestion["lat"] is num
         ? (suggestion["lat"] as num).toDouble()
         : double.tryParse("${suggestion["lat"]}");
@@ -605,14 +618,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                   address,
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  "Lat ${lat.toStringAsFixed(6)} | Lng ${lng.toStringAsFixed(6)}",
-                  style: const TextStyle(
-                    color: Color(0xFF475569),
-                    fontSize: 12,
-                  ),
-                ),
               ],
             ),
           ),
@@ -629,10 +634,9 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     ];
 
     if (previewPoints.isEmpty) {
-      final currentLocationPoint =
-          currentLat != null && currentLng != null
-              ? LatLng(currentLat!, currentLng!)
-              : null;
+      final currentLocationPoint = currentLat != null && currentLng != null
+          ? LatLng(currentLat!, currentLng!)
+          : null;
 
       if (currentLocationPoint != null) {
         return SizedBox(
@@ -649,7 +653,8 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                      urlTemplate:
+                          "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                       userAgentPackageName: "com.example.bike_taxi_app",
                     ),
                     MarkerLayer(
@@ -664,53 +669,57 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                             color: Color(0xFF16A34A),
                           ),
                         ),
-                        ...availableDrivers.map((driver) {
-                          final loc = driver["location"];
-                          final double? lat = loc != null && loc["lat"] is num
-                              ? (loc["lat"] as num).toDouble()
-                              : (loc != null && loc["lat"] is String
-                                  ? double.tryParse(loc["lat"])
-                                  : null);
-                          final double? lng = loc != null && loc["lng"] is num
-                              ? (loc["lng"] as num).toDouble()
-                              : (loc != null && loc["lng"] is String
-                                  ? double.tryParse(loc["lng"])
-                                  : null);
-                          if (lat == null || lng == null) {
-                            return const Marker(
-                              point: LatLng(0, 0),
-                              child: SizedBox.shrink(),
-                            );
-                          }
+                        ...availableDrivers
+                            .map((driver) {
+                              final loc = driver["location"];
+                              final double? lat =
+                                  loc != null && loc["lat"] is num
+                                  ? (loc["lat"] as num).toDouble()
+                                  : (loc != null && loc["lat"] is String
+                                        ? double.tryParse(loc["lat"])
+                                        : null);
+                              final double? lng =
+                                  loc != null && loc["lng"] is num
+                                  ? (loc["lng"] as num).toDouble()
+                                  : (loc != null && loc["lng"] is String
+                                        ? double.tryParse(loc["lng"])
+                                        : null);
+                              if (lat == null || lng == null) {
+                                return const Marker(
+                                  point: LatLng(0, 0),
+                                  child: SizedBox.shrink(),
+                                );
+                              }
 
-                          return Marker(
-                            point: LatLng(lat, lng),
-                            width: 40,
-                            height: 40,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.25),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 3),
+                              return Marker(
+                                point: LatLng(lat, lng),
+                                width: 40,
+                                height: 40,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.25),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                    border: Border.all(
+                                      color: AppPalette.primary,
+                                      width: 2.2,
+                                    ),
                                   ),
-                                ],
-                                border: Border.all(
-                                  color: AppPalette.primary,
-                                  width: 2.2,
+                                  child: const Icon(
+                                    Icons.directions_bike_rounded,
+                                    color: AppPalette.primary,
+                                    size: 20,
+                                  ),
                                 ),
-                              ),
-                              child: const Icon(
-                                Icons.directions_bike_rounded,
-                                color: AppPalette.primary,
-                                size: 20,
-                              ),
-                            ),
-                          );
-                        }).where((m) => m.point.latitude != 0.0),
+                              );
+                            })
+                            .where((m) => m.point.latitude != 0.0),
                       ],
                     ),
                   ],
@@ -805,32 +814,32 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
         );
       }
 
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.08)),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.map_outlined, color: Color(0xFF64748B)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  currentLocationMessage ??
-                      "Enable location access so the preview starts from your live position.",
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontWeight: FontWeight.w600,
-                  ),
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.map_outlined, color: Color(0xFF64748B)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                currentLocationMessage ??
+                    "Enable location access so the preview starts from your live position.",
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ],
-          ),
-        );
-      }
+            ),
+          ],
+        ),
+      );
+    }
 
     final linePoints = previewPoints.length == 2
         ? [previewPoints.first, previewPoints.last]
@@ -866,41 +875,52 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
             color: Color(0xFFDC2626),
           ),
         ),
-      ...availableDrivers.map((driver) {
-        final loc = driver["location"];
-        final double? lat = loc != null && loc["lat"] is num
-            ? (loc["lat"] as num).toDouble()
-            : (loc != null && loc["lat"] is String ? double.tryParse(loc["lat"]) : null);
-        final double? lng = loc != null && loc["lng"] is num
-            ? (loc["lng"] as num).toDouble()
-            : (loc != null && loc["lng"] is String ? double.tryParse(loc["lng"]) : null);
-        if (lat == null || lng == null) return const Marker(point: LatLng(0, 0), child: SizedBox.shrink());
+      ...availableDrivers
+          .map((driver) {
+            final loc = driver["location"];
+            final double? lat = loc != null && loc["lat"] is num
+                ? (loc["lat"] as num).toDouble()
+                : (loc != null && loc["lat"] is String
+                      ? double.tryParse(loc["lat"])
+                      : null);
+            final double? lng = loc != null && loc["lng"] is num
+                ? (loc["lng"] as num).toDouble()
+                : (loc != null && loc["lng"] is String
+                      ? double.tryParse(loc["lng"])
+                      : null);
+            if (lat == null || lng == null) {
+              return const Marker(
+                point: LatLng(0, 0),
+                child: SizedBox.shrink(),
+              );
+            }
 
-        return Marker(
-          point: LatLng(lat, lng),
-          width: 40,
-          height: 40,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.25),
-                  blurRadius: 6,
-                  offset: const Offset(0, 3),
+            return Marker(
+              point: LatLng(lat, lng),
+              width: 40,
+              height: 40,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                  border: Border.all(color: AppPalette.primary, width: 2.2),
                 ),
-              ],
-              border: Border.all(color: AppPalette.primary, width: 2.2),
-            ),
-            child: const Icon(
-              Icons.directions_bike_rounded,
-              color: AppPalette.primary,
-              size: 20,
-            ),
-          ),
-        );
-      }).where((m) => m.point.latitude != 0.0),
+                child: const Icon(
+                  Icons.directions_bike_rounded,
+                  color: AppPalette.primary,
+                  size: 20,
+                ),
+              ),
+            );
+          })
+          .where((m) => m.point.latitude != 0.0),
     ];
 
     return SizedBox(
@@ -972,7 +992,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
 
   void _onMapTapped(LatLng point) {
     if (pickupLat == null || pickupLng == null) {
-      final label = "Map Tap (${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)})";
+      const label = "Selected Pickup Location";
       setState(() {
         pickupLat = point.latitude;
         pickupLng = point.longitude;
@@ -985,7 +1005,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
       });
       _reverseGeocodeAndUpdate(point.latitude, point.longitude, isPickup: true);
     } else {
-      final label = "Map Tap (${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)})";
+      const label = "Selected Drop Location";
       setState(() {
         dropLat = point.latitude;
         dropLng = point.longitude;
@@ -996,18 +1016,24 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
         dropError = null;
         message = "Drop set from map tap";
       });
-      _reverseGeocodeAndUpdate(point.latitude, point.longitude, isPickup: false);
+      _reverseGeocodeAndUpdate(
+        point.latitude,
+        point.longitude,
+        isPickup: false,
+      );
     }
   }
 
-  Future<void> _reverseGeocodeAndUpdate(double lat, double lng, {required bool isPickup}) async {
+  Future<void> _reverseGeocodeAndUpdate(
+    double lat,
+    double lng, {
+    required bool isPickup,
+  }) async {
     try {
-      final results = await ApiService.searchPhotonPlaces(
-        "${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}",
-      );
-      if (!mounted || results.isEmpty) return;
+      final result = await ApiService.reversePhotonPlace(lat, lng);
+      if (!mounted || result == null) return;
 
-      final bestAddress = results.first["address"]?.toString();
+      final bestAddress = result["address"]?.toString();
       if (bestAddress != null && bestAddress.isNotEmpty) {
         setState(() {
           if (isPickup) {
@@ -1022,7 +1048,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
         });
       }
     } catch (_) {
-      // Keep the coordinate-based label if reverse geocoding fails
+      // Keep the readable fallback label if reverse geocoding fails.
     }
   }
 
@@ -1055,9 +1081,16 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
               const SizedBox(height: 16),
               _buildFareDetailRow("Base Fare", "Rs. 40.00"),
               const SizedBox(height: 10),
-              _buildFareDetailRow("Distance Charge", "Rs. ${((fare - 40).clamp(0, 100000)).toStringAsFixed(2)}"),
+              _buildFareDetailRow(
+                "Distance Charge",
+                "Rs. ${((fare - 40).clamp(0, 100000)).toStringAsFixed(2)}",
+              ),
               const Divider(height: 24),
-              _buildFareDetailRow("Total Estimated Fare", "Rs. ${fare.toStringAsFixed(2)}", isTotal: true),
+              _buildFareDetailRow(
+                "Total Estimated Fare",
+                "Rs. ${fare.toStringAsFixed(2)}",
+                isTotal: true,
+              ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
@@ -1070,7 +1103,11 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     );
   }
 
-  Widget _buildFareDetailRow(String label, String value, {bool isTotal = false}) {
+  Widget _buildFareDetailRow(
+    String label,
+    String value, {
+    bool isTotal = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -1167,7 +1204,8 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
 
       String errMessage = e.toString().replaceFirst("Exception: ", "");
       if (errMessage.toLowerCase().contains("no drivers available")) {
-        errMessage = "No drivers are currently available. Please try again later.";
+        errMessage =
+            "No drivers are currently available. Please try again later.";
       }
 
       setState(() {
@@ -1292,15 +1330,13 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                                         setState(() {
                                           message = "Getting your location...";
                                         });
-                                        final pos = await LocationService
-                                            .getCurrentPosition();
+                                        final pos =
+                                            await LocationService.getCurrentPosition();
                                         if (!mounted) return;
                                         if (pos != null) {
-                                          final label =
-                                              "My Location (${pos['lat']!.toStringAsFixed(5)}, ${pos['lng']!.toStringAsFixed(5)})";
                                           _selectSuggestion({
                                             "placeId": "gps_current_loc",
-                                            "address": label,
+                                            "address": "Current Location",
                                             "lat": pos['lat'],
                                             "lng": pos['lng'],
                                           }, isPickup: true);
@@ -1364,7 +1400,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                                     "123 Green Glen Layout, Outer Ring Road, Bangalore",
                                 "lat": 12.9279,
                                 "lng": 77.6271,
-                                "placeId": "home_preset"
+                                "placeId": "home_preset",
                               },
                               {
                                 "name": "Office",
@@ -1372,14 +1408,15 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                                     "Embassy TechVillage, Bellandur, Bangalore",
                                 "lat": 12.9784,
                                 "lng": 77.6408,
-                                "placeId": "office_preset"
+                                "placeId": "office_preset",
                               },
                               {
                                 "name": "Metro Station",
-                                "address": "Indiranagar Metro Station, Bangalore",
+                                "address":
+                                    "Indiranagar Metro Station, Bangalore",
                                 "lat": 12.9716,
                                 "lng": 77.5946,
-                                "placeId": "metro_preset"
+                                "placeId": "metro_preset",
                               },
                               {
                                 "name": "Airport",
@@ -1387,34 +1424,36 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                                     "Kempegowda International Airport, Bangalore",
                                 "lat": 13.1986,
                                 "lng": 77.7066,
-                                "placeId": "airport_preset"
-                              }
-                            ].map((preset) => Padding(
-                                  padding: const EdgeInsets.only(right: 6),
-                                  child: ActionChip(
-                                    avatar: const Icon(
-                                      Icons.place_rounded,
-                                      size: 12,
-                                      color: AppPalette.accent,
-                                    ),
-                                    label: Text(
-                                      preset["name"] as String,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    onPressed: () {
-                                      _selectSuggestion({
-                                        "placeId": preset["placeId"],
-                                        "address": preset["address"],
-                                        "lat": preset["lat"],
-                                        "lng": preset["lng"],
-                                      }, isPickup: false);
-                                    },
+                                "placeId": "airport_preset",
+                              },
+                            ].map(
+                              (preset) => Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ActionChip(
+                                  avatar: const Icon(
+                                    Icons.place_rounded,
+                                    size: 12,
+                                    color: AppPalette.accent,
                                   ),
-                                )),
+                                  label: Text(
+                                    preset["name"] as String,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  onPressed: () {
+                                    _selectSuggestion({
+                                      "placeId": preset["placeId"],
+                                      "address": preset["address"],
+                                      "lat": preset["lat"],
+                                      "lng": preset["lng"],
+                                    }, isPickup: false);
+                                  },
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1532,9 +1571,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                       initialValue: selectedPaymentMethod,
                       decoration: const InputDecoration(
                         labelText: "Payment Method",
-                        prefixIcon: Icon(
-                          Icons.account_balance_wallet_rounded,
-                        ),
+                        prefixIcon: Icon(Icons.account_balance_wallet_rounded),
                       ),
                       items: const [
                         DropdownMenuItem(value: "Cash", child: Text("Cash")),
