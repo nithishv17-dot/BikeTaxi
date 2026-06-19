@@ -84,11 +84,11 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
   Widget buildRideCard(Map<String, dynamic> ride) {
     final pickup = readableLocationLabel(
       ride["pickupAddress"]?.toString() ?? ride["pickup"]?.toString(),
-      fallback: "Selected Pickup Location",
+      fallback: "Pickup address",
     );
     final destination = readableLocationLabel(
       ride["dropAddress"]?.toString() ?? ride["destination"]?.toString(),
-      fallback: "Selected Drop Location",
+      fallback: "Drop address",
     );
     final status = ride["status"]?.toString() ?? "";
     final initialFare = ride["initialFare"]?.toString() ?? "N/A";

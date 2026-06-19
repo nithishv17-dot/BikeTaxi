@@ -14,7 +14,7 @@ String readableLocationLabel(String? value, {required String fallback}) {
   }
 
   if (RegExp(r'^my location\s*\(', caseSensitive: false).hasMatch(text)) {
-    return "Current Location";
+    return "Current address";
   }
 
   if (RegExp(r'^map tap\s*\(', caseSensitive: false).hasMatch(text)) {

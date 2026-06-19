@@ -306,12 +306,12 @@ class _DriverScreenState extends State<DriverScreen> {
             final riderPhone = ride["userId"]?["phone"] ?? "N/A";
             final pickup = readableLocationLabel(
               ride["pickupAddress"]?.toString() ?? ride["pickup"]?.toString(),
-              fallback: "Selected Pickup Location",
+              fallback: "Pickup address",
             );
             final drop = readableLocationLabel(
               ride["dropAddress"]?.toString() ??
                   ride["destination"]?.toString(),
-              fallback: "Selected Drop Location",
+              fallback: "Drop address",
             );
             final fare = ride["estimatedFare"] ?? 0;
             final otpController = _otpControllerForRide(rideId);

@@ -378,9 +378,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     final rawAddress = suggestion["address"]?.toString() ?? "";
     final address = readableLocationLabel(
       rawAddress,
-      fallback: isPickup
-          ? "Selected Pickup Location"
-          : "Selected Drop Location",
+      fallback: isPickup ? "Pickup address" : "Drop address",
     );
     final lat = suggestion["lat"] is num
         ? (suggestion["lat"] as num).toDouble()
@@ -992,7 +990,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
 
   void _onMapTapped(LatLng point) {
     if (pickupLat == null || pickupLng == null) {
-      const label = "Selected Pickup Location";
+      const label = "Resolving pickup address...";
       setState(() {
         pickupLat = point.latitude;
         pickupLng = point.longitude;
@@ -1001,11 +999,16 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
         pickupInput = label;
         pickupPlaceId = "map_tap_pickup";
         pickupError = null;
-        message = "Pickup set from map tap";
+        message = "Finding pickup address...";
       });
-      _reverseGeocodeAndUpdate(point.latitude, point.longitude, isPickup: true);
+      _reverseGeocodeAndUpdate(
+        point.latitude,
+        point.longitude,
+        isPickup: true,
+        fallbackAddress: "Pickup address from map",
+      );
     } else {
-      const label = "Selected Drop Location";
+      const label = "Resolving drop address...";
       setState(() {
         dropLat = point.latitude;
         dropLng = point.longitude;
@@ -1014,12 +1017,13 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
         dropInput = label;
         dropPlaceId = "map_tap_drop";
         dropError = null;
-        message = "Drop set from map tap";
+        message = "Finding drop address...";
       });
       _reverseGeocodeAndUpdate(
         point.latitude,
         point.longitude,
         isPickup: false,
+        fallbackAddress: "Drop address from map",
       );
     }
   }
@@ -1028,28 +1032,64 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     double lat,
     double lng, {
     required bool isPickup,
+    required String fallbackAddress,
   }) async {
+    var nextAddress = fallbackAddress;
     try {
       final result = await ApiService.reversePhotonPlace(lat, lng);
-      if (!mounted || result == null) return;
+      if (!mounted) return;
 
-      final bestAddress = result["address"]?.toString();
+      final bestAddress = result?["address"]?.toString();
       if (bestAddress != null && bestAddress.isNotEmpty) {
-        setState(() {
-          if (isPickup) {
-            pickupAddress = bestAddress;
-            pickupController.text = bestAddress;
-            pickupInput = bestAddress;
-          } else {
-            dropAddress = bestAddress;
-            destinationController.text = bestAddress;
-            dropInput = bestAddress;
-          }
-        });
+        nextAddress = readableLocationLabel(
+          bestAddress,
+          fallback: fallbackAddress,
+        );
       }
     } catch (_) {
-      // Keep the readable fallback label if reverse geocoding fails.
+      // Keep a worded address fallback if reverse geocoding fails.
     }
+
+    if (!mounted) return;
+
+    setState(() {
+      if (isPickup) {
+        pickupAddress = nextAddress;
+        pickupController.text = nextAddress;
+        pickupInput = nextAddress;
+        pickupError = null;
+        message = "Pickup address set";
+      } else {
+        dropAddress = nextAddress;
+        destinationController.text = nextAddress;
+        dropInput = nextAddress;
+        dropError = null;
+        message = "Drop address set";
+      }
+    });
+  }
+
+  Future<void> _selectCurrentPickupAddress(Map<String, double> pos) async {
+    const label = "Resolving current address...";
+    _selectSuggestion({
+      "placeId": "gps_current_loc",
+      "address": label,
+      "lat": pos['lat'],
+      "lng": pos['lng'],
+    }, isPickup: true);
+
+    setState(() {
+      currentLat = pos['lat'];
+      currentLng = pos['lng'];
+      message = "Finding your current address...";
+    });
+
+    await _reverseGeocodeAndUpdate(
+      pos['lat']!,
+      pos['lng']!,
+      isPickup: true,
+      fallbackAddress: "Current pickup address",
+    );
   }
 
   void _showFareBreakdown() {
@@ -1334,22 +1374,8 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                                             await LocationService.getCurrentPosition();
                                         if (!mounted) return;
                                         if (pos != null) {
-                                          _selectSuggestion({
-                                            "placeId": "gps_current_loc",
-                                            "address": "Current Location",
-                                            "lat": pos['lat'],
-                                            "lng": pos['lng'],
-                                          }, isPickup: true);
-                                          setState(() {
-                                            currentLat = pos['lat'];
-                                            currentLng = pos['lng'];
-                                            message =
-                                                "Pickup set to your live location";
-                                          });
-                                          _reverseGeocodeAndUpdate(
-                                            pos['lat']!,
-                                            pos['lng']!,
-                                            isPickup: true,
+                                          await _selectCurrentPickupAddress(
+                                            pos,
                                           );
                                         } else {
                                           setState(() {

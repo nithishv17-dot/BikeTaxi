@@ -923,11 +923,11 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     final userId = _rideUserId();
     final pickupAddress = readableLocationLabel(
       ride?["pickupAddress"]?.toString() ?? ride?["pickup"]?.toString(),
-      fallback: "Selected Pickup Location",
+      fallback: "Pickup address",
     );
     final dropAddress = readableLocationLabel(
       ride?["dropAddress"]?.toString() ?? ride?["destination"]?.toString(),
-      fallback: "Selected Drop Location",
+      fallback: "Drop address",
     );
     final pickupLat = _toDouble(ride?["pickupLat"]);
     final pickupLng = _toDouble(ride?["pickupLng"]);
@@ -1320,11 +1320,11 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     final status = ride?["status"]?.toString() ?? "";
     final pickupAddress = readableLocationLabel(
       ride?["pickupAddress"]?.toString() ?? ride?["pickup"]?.toString(),
-      fallback: "Selected Pickup Location",
+      fallback: "Pickup address",
     );
     final dropAddress = readableLocationLabel(
       ride?["dropAddress"]?.toString() ?? ride?["destination"]?.toString(),
-      fallback: "Selected Drop Location",
+      fallback: "Drop address",
     );
     final dynamic negotiatedFare = ride?["offeredFare"] ?? ride?["finalFare"];
     final fare =

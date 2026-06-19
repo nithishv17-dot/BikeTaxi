@@ -257,7 +257,7 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
                   readableLocationLabel(
                     ride["pickupAddress"]?.toString() ??
                         ride["pickup"]?.toString(),
-                    fallback: "Selected Pickup Location",
+                    fallback: "Pickup address",
                   ),
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
@@ -291,7 +291,7 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
                   readableLocationLabel(
                     ride["dropAddress"]?.toString() ??
                         ride["destination"]?.toString(),
-                    fallback: "Selected Drop Location",
+                    fallback: "Drop address",
                   ),
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
