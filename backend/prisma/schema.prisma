@@ -1,0 +1,237 @@
+// BikeTaxi PostgreSQL Schema with Prisma ORM
+// Phase 3: PostgreSQL Schema Design
+// Generated: 2026-06-30
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USERS TABLE - Stores rider and driver user accounts
+// ============================================================================
+model User {
+  id            String    @id @default(cuid())
+  name          String    @db.VarChar(255)
+  phone         String    @unique @db.VarChar(20)
+  password      String    @db.VarChar(255)
+  role          UserRole  @default(USER) // USER or DRIVER
+  email         String?   @unique @db.VarChar(255)
+  profileImage  String?   @db.Text
+  
+  // Location tracking
+  latitude      Float?
+  longitude     Float?
+  lastLocationUpdate DateTime?
+  
+  // Availability (for drivers)
+  isAvailable   Boolean   @default(false)
+  
+  // Account status
+  isVerified    Boolean   @default(false)
+  isBanned      Boolean   @default(false)
+  
+  // Ratings and statistics
+  averageRating Float?    @default(0)
+  totalRatings  Int       @default(0)
+  totalRides    Int       @default(0)
+  
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+  
+  // Relations
+  ridesAsRider  Ride[]    @relation("rider")
+  ridesAsDriver Ride[]    @relation("driver")
+  ratings       Rating[]
+
+  @@index([phone])
+  @@index([role])
+  @@index([isAvailable])
+  @@index([createdAt])
+  @@map("users")
+}
+
+// ============================================================================
+// RIDES TABLE - Main ride records with fare negotiation tracking
+// ============================================================================
+model Ride {
+  id                String          @id @default(cuid())
+  
+  // Rider info
+  riderId           String
+  rider             User            @relation("rider", fields: [riderId], references: [id], onDelete: Cascade)
+  
+  // Driver info (populated when driver accepts)
+  driverId          String?
+  driver            User?           @relation("driver", fields: [driverId], references: [id], onDelete: SetNull)
+  
+  // Location data - Pickup
+  pickupAddress     String          @db.VarChar(500)
+  pickupLatitude    Float
+  pickupLongitude   Float
+  pickupPlaceId     String?         @db.VarChar(255)
+  
+  // Location data - Dropoff
+  dropAddress       String          @db.VarChar(500)
+  dropLatitude      Float
+  dropLongitude     Float
+  dropPlaceId       String?         @db.VarChar(255)
+  
+  // Distance and route
+  distanceKm        Float?
+  estimatedDuration Int?            // seconds
+  polyline          String?         @db.Text // encoded polyline for route
+  
+  // Fare management
+  initialFare       Float           @default(0)
+  estimatedFare     Float           @default(0)
+  offeredFare       Float?          // driver's counter-offer
+  finalFare         Float?
+  
+  // Payment
+  paymentMethod     PaymentMethod   @default(CASH)
+  paymentStatus     PaymentStatus   @default(PENDING)
+  
+  // Negotiation
+  status            RideStatus      @default(REQUESTED)
+  negotiationStatus NegotiationStatus @default(OPEN)
+  negotiationExpiresAt DateTime?
+  
+  // OTP for verification
+  otp               String?         @db.VarChar(10)
+  otpVerified       Boolean         @default(false)
+  
+  // Ratings
+  riderRating       Int?            // 1-5
+  driverRating      Int?            // 1-5
+  riderFeedback     String?         @db.Text
+  driverFeedback    String?         @db.Text
+  
+  // Timestamps
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  requestedAt       DateTime?
+  acceptedAt        DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  
+  // Relations
+  offers            Offer[]
+  ratings           Rating[]
+  
+  @@index([riderId])
+  @@index([driverId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
+  @@index([completedAt])
+  @@map("rides")
+}
+
+// ============================================================================
+// OFFERS TABLE - Driver bids during negotiation
+// ============================================================================
+model Offer {
+  id              String        @id @default(cuid())
+  rideId          String
+  ride            Ride          @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  
+  driverId        String
+  driver          User          @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  
+  // Offer details
+  offeredFare     Float
+  offerStatus     OfferStatus   @default(PENDING)
+  
+  // Timestamps
+  createdAt       DateTime      @default(now())
+  expiresAt       DateTime
+  respondedAt     DateTime?
+  
+  @@index([rideId])
+  @@index([driverId])
+  @@index([offerStatus])
+  @@index([createdAt])
+  @@map("offers")
+}
+
+// ============================================================================
+// RATINGS TABLE - Separate table for rating history
+// ============================================================================
+model Rating {
+  id              String        @id @default(cuid())
+  
+  rideId          String
+  ride            Ride          @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  
+  ratedById       String
+  ratedBy         User          @relation("ratedByUser", fields: [ratedById], references: [id], onDelete: Cascade)
+  
+  ratedUserId     String
+  ratedUser       User          @relation("ratedUser", fields: [ratedUserId], references: [id], onDelete: Cascade)
+  
+  // Rating info
+  rating          Int           @db.SmallInt // 1-5
+  comment         String?       @db.Text
+  
+  // Timestamps
+  createdAt       DateTime      @default(now())
+  
+  @@index([rideId])
+  @@index([ratedById])
+  @@index([ratedUserId])
+  @@map("ratings")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  USER
+  DRIVER
+  ADMIN
+}
+
+enum RideStatus {
+  REQUESTED        // Initial state
+  NEGOTIATING      // Waiting for driver acceptance
+  ACCEPTED         // Driver accepted
+  STARTED          // Ride in progress
+  COMPLETED        // Ride finished
+  CANCELLED        // Ride cancelled
+}
+
+enum NegotiationStatus {
+  OPEN             // Accepting offers
+  LOCKED           // Offer accepted, locked in
+  EXPIRED          // Negotiation timed out
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum OfferStatus {
+  PENDING          // Waiting for response
+  SELECTED         // Selected by rider (but not yet confirmed)
+  ACCEPTED         // Confirmed by rider
+  REJECTED         // Rejected by rider
+  EXPIRED          // Offer expired
+}
