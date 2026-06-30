@@ -211,7 +211,6 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.pop(context); // Close connecting dialog
 
     final mockIdentifier = selectedEmail; // We use email as the identifier
-    final mockUsername = selectedEmail.split("@").first.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '') + "_go";
     final mockName = selectedEmail.split("@").first
         .replaceAll(RegExp(r'[._-]'), ' ')
         .split(' ')
@@ -234,7 +233,6 @@ class _LoginScreenState extends State<LoginScreen> {
         final errStr = loginErr.toString();
         if (errStr.contains("User not found")) {
           await ApiService.register(
-            mockUsername,
             mockName,
             mockIdentifier,
             mockPassword,
@@ -426,8 +424,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               controller: identifierController,
                               keyboardType: TextInputType.text,
                               decoration: const InputDecoration(
-                                labelText: "Username or Phone Number",
-                                hintText: "Enter username or phone number",
+                                labelText: "Name or Phone Number",
+                                hintText: "Enter name or phone number",
                                 prefixIcon: Icon(Icons.person_outline_rounded),
                               ),
                             ),

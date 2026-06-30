@@ -105,7 +105,6 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> register(
-    String username,
     String name,
     String phone,
     String password, {
@@ -118,7 +117,6 @@ class ApiService {
         "Bypass-Tunnel-Reminder": "true",
       },
       body: jsonEncode({
-        "username": username,
         "name": name,
         "phone": phone,
         "password": password,

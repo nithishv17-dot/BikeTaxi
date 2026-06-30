@@ -16,7 +16,6 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final usernameController = TextEditingController();
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
   final passwordController = TextEditingController();
@@ -27,8 +26,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool isDriver = false;
 
   void registerUser() async {
-    if (usernameController.text.trim().isEmpty ||
-        nameController.text.trim().isEmpty ||
+    if (nameController.text.trim().isEmpty ||
         phoneController.text.trim().isEmpty ||
         passwordController.text.trim().isEmpty) {
       setState(() {
@@ -44,7 +42,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       final response = await ApiService.register(
-        usernameController.text.trim(),
         nameController.text.trim(),
         phoneController.text.trim(),
         passwordController.text.trim(),
@@ -185,7 +182,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     Navigator.pop(context); // Close connecting dialog
 
     final mockIdentifier = selectedEmail; // email acts as phone/identifier
-    final mockUsername = selectedEmail.split("@").first.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '') + "_go";
     final mockName = selectedEmail.split("@").first
         .replaceAll(RegExp(r'[._-]'), ' ')
         .split(' ')
@@ -208,7 +204,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         final errStr = loginErr.toString();
         if (errStr.contains("User not found")) {
           await ApiService.register(
-            mockUsername,
             mockName,
             mockIdentifier,
             mockPassword,
@@ -288,7 +283,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    usernameController.dispose();
     nameController.dispose();
     phoneController.dispose();
     passwordController.dispose();
@@ -399,15 +393,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ],
                             ),
                             const SizedBox(height: 22),
-                            TextField(
-                              controller: usernameController,
-                              textInputAction: TextInputAction.next,
-                              decoration: const InputDecoration(
-                                labelText: "Username",
-                                hintText: "Enter a unique username",
-                                prefixIcon: Icon(Icons.alternate_email_rounded),
-                              ),
-                            ),
                             TextField(
                               controller: nameController,
                               textInputAction: TextInputAction.next,
