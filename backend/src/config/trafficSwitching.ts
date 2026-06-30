@@ -257,5 +257,3 @@ export function getTrafficSwitchingManager(): TrafficSwitchingManager {
 }
 
 export { TrafficSwitchingManager, TrafficConfig };
-EOF
-echo "✓ Traffic switching configuration created"

@@ -1,6 +1,5 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import 'express-async-errors';
 import { createLogger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import userRoutes from './routes/users';
