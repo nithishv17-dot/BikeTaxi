@@ -8,11 +8,24 @@ router.post("/register", async (req, res) => {
   try {
     console.log("REGISTER BODY:", req.body);
 
-    const { name, phone, password, role } = req.body;
+    const { username, name, phone, password, role } = req.body;
+
+    if (!username || !/^[a-zA-Z0-9_]{4,20}$/.test(username)) {
+      return res.status(400).json({
+        message: "Username must be 4-20 characters long and can only contain letters, numbers, and underscores"
+      });
+    }
 
     if (!name || !phone || !password) {
       return res.status(400).json({
         message: "All fields are required"
+      });
+    }
+
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) {
+      return res.status(400).json({
+        message: "Username already exists"
       });
     }
 
@@ -24,7 +37,7 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    const user = new User({ name, phone, password, role: role || "user" });
+    const user = new User({ username, name, phone, password, role: role || "user" });
     await user.save();
 
     return res.status(201).json({
@@ -40,15 +53,17 @@ router.post("/register", async (req, res) => {
 
 router.post("/login", async (req, res) => {
   try {
-    const { phone, password, role } = req.body;
+    const { identifier, password, role } = req.body;
 
-    if (!phone || !password) {
+    if (!identifier || !password) {
       return res.status(400).json({
-        message: "Phone and password are required"
+        message: "Username/Phone and password are required"
       });
     }
 
-    const user = await User.findOne({ phone });
+    const user = await User.findOne({
+      $or: [{ username: identifier }, { phone: identifier }]
+    });
 
     if (!user) {
       return res.status(404).json({
