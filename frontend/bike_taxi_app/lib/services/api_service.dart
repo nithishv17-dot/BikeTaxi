@@ -29,7 +29,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> login(
-    String phone,
+    String identifier,
     String password, {
     String role = "user",
   }) async {
@@ -39,7 +39,7 @@ class ApiService {
         "Content-Type": "application/json",
         "Bypass-Tunnel-Reminder": "true",
       },
-      body: jsonEncode({"phone": phone, "password": password, "role": role}),
+      body: jsonEncode({"identifier": identifier, "password": password, "role": role}),
     );
 
     return _handleResponse(response);
@@ -105,6 +105,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> register(
+    String username,
     String name,
     String phone,
     String password, {
@@ -117,6 +118,7 @@ class ApiService {
         "Bypass-Tunnel-Reminder": "true",
       },
       body: jsonEncode({
+        "username": username,
         "name": name,
         "phone": phone,
         "password": password,

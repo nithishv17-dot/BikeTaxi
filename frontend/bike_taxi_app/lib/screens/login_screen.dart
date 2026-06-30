@@ -15,7 +15,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController identifierController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
   String result = "";
@@ -24,10 +24,10 @@ class _LoginScreenState extends State<LoginScreen> {
   bool isDriver = false;
 
   void loginUser() async {
-    if (phoneController.text.trim().isEmpty ||
+    if (identifierController.text.trim().isEmpty ||
         passwordController.text.trim().isEmpty) {
       setState(() {
-        result = "Please enter phone and password";
+        result = "Please enter username/phone and password";
       });
       return;
     }
@@ -41,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
       print("Login button pressed");
 
       final response = await ApiService.login(
-        phoneController.text.trim(),
+        identifierController.text.trim(),
         passwordController.text.trim(),
         role: isDriver ? "driver" : "user",
       );
@@ -210,7 +210,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     Navigator.pop(context); // Close connecting dialog
 
-    final mockPhone = selectedEmail;
+    final mockIdentifier = selectedEmail; // We use email as the identifier
+    final mockUsername = selectedEmail.split("@").first.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '') + "_go";
     final mockName = selectedEmail.split("@").first
         .replaceAll(RegExp(r'[._-]'), ' ')
         .split(' ')
@@ -224,7 +225,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       try {
         loginResponse = await ApiService.login(
-          mockPhone,
+          mockIdentifier,
           mockPassword,
           role: isDriver ? "driver" : "user",
         );
@@ -233,20 +234,21 @@ class _LoginScreenState extends State<LoginScreen> {
         final errStr = loginErr.toString();
         if (errStr.contains("User not found")) {
           await ApiService.register(
+            mockUsername,
             mockName,
-            mockPhone,
+            mockIdentifier,
             mockPassword,
             role: isDriver ? "driver" : "user",
           );
           loginResponse = await ApiService.login(
-            mockPhone,
+            mockIdentifier,
             mockPassword,
             role: isDriver ? "driver" : "user",
           );
           actualRole = loginResponse["role"]?.toString() ?? actualRole;
         } else if (errStr.contains("This account is not a driver account")) {
           loginResponse = await ApiService.login(
-            mockPhone,
+            mockIdentifier,
             mockPassword,
             role: "user",
           );
@@ -311,7 +313,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    phoneController.dispose();
+    identifierController.dispose();
     passwordController.dispose();
     super.dispose();
   }
@@ -421,12 +423,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 22),
                             TextField(
-                              controller: phoneController,
-                              keyboardType: TextInputType.phone,
+                              controller: identifierController,
+                              keyboardType: TextInputType.text,
                               decoration: const InputDecoration(
-                                labelText: "Phone",
-                                hintText: "Enter mobile number",
-                                prefixIcon: Icon(Icons.phone_rounded),
+                                labelText: "Username or Phone Number",
+                                hintText: "Enter username or phone number",
+                                prefixIcon: Icon(Icons.person_outline_rounded),
                               ),
                             ),
                             const SizedBox(height: 14),

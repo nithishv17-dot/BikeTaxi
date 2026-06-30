@@ -6,11 +6,21 @@ exports.registerUser = async(req,res)=>{
 
  try{
 
-  const {name,phone,password} = req.body;
+  const {username, name, phone, password} = req.body;
+
+  if (!username || !/^[a-zA-Z0-9_]{4,20}$/.test(username)) {
+    return res.status(400).json({message: "Username must be 4-20 characters long and can only contain letters, numbers, and underscores"});
+  }
+
+  const existingUsername = await User.findOne({username});
+  if (existingUsername) {
+    return res.status(400).json({message: "Username already exists"});
+  }
 
   const hashedPassword = await bcrypt.hash(password,10);
 
   const user = new User({
+    username,
     name,
     phone,
     password:hashedPassword
@@ -33,9 +43,15 @@ exports.loginUser = async(req,res)=>{
 
  try{
 
-  const {phone,password} = req.body;
+  const {identifier, password} = req.body;
 
-  const user = await User.findOne({phone});
+  if (!identifier) {
+    return res.status(400).json({message: "Username or Phone number is required"});
+  }
+
+  const user = await User.findOne({
+    $or: [{ username: identifier }, { phone: identifier }]
+  });
 
   if(!user){
    return res.status(400).json({message:"User not found"});
