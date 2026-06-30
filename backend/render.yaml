@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: biketaxi-api
+    runtime: node
+    plan: standard
+    buildCommand: npm install --legacy-peer-deps && npm run build:ts
+    startCommand: npm run start:ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_TYPE
+        value: postgres
+      - key: POSTGRES_MODE
+        value: primary
+      - key: MONGODB_MODE
+        value: backup-only
+      - key: DUAL_WRITE_ENABLED
+        value: "false"
+      - key: LOG_LEVEL
+        value: info
+      - key: PORT
+        value: "10000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: biketaxi-db
+          property: connectionString
+    disk:
+      name: biketaxi-logs
+      mountPath: /var/log
+      sizeGB: 10
+    headers:
+      - path: /api/*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /api/*
+        name: X-Frame-Options
+        value: DENY
+
+databases:
+  - name: biketaxi-db
+    plan: standard
+    databaseName: biketaxi
+    user: biketaxi_user
