@@ -1,25 +1,28 @@
 {
   "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
   "installCommand": "npm install --legacy-peer-deps",
-  "framework": "nextjs",
-  "outputDirectory": ".next",
+  "framework": "create-react-app",
+  "outputDirectory": "build",
   "env": {
-    "NEXT_PUBLIC_API_URL": "@api_url",
-    "NEXT_PUBLIC_APP_NAME": "BikeTaxi",
-    "NEXT_PUBLIC_ENVIRONMENT": "production"
+    "REACT_APP_API_URL": "@api_url",
+    "REACT_APP_ENVIRONMENT": "production"
   },
   "headers": [
     {
-      "source": "/api/:path*",
+      "source": "/(.*)",
       "headers": [
         {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/static/(.*)",
+      "headers": [
         {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     }
@@ -27,7 +30,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "$NEXT_PUBLIC_API_URL/api/:path*"
+      "destination": "https://biketaxi-api-prod.onrender.com/api/:path*"
     }
   ],
   "regions": [

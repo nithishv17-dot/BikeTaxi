@@ -11,6 +11,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const { user } = useAuthStore();
+
   return (
     <Router>
       <Routes>
@@ -19,9 +21,11 @@ function App() {
         <Route
           path="/"
           element={
-            <ProtectedRoute>
+            user ? (
               <Home />
-            </ProtectedRoute>
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
         />
         <Route
@@ -32,6 +36,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>
   );
