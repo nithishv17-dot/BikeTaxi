@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
+    "test:unit": "jest --testPathPattern=__tests__ --coverage",
+    "test:integration": "jest --testPathPattern=integration",
+    "test:e2e": "jest --testPathPattern=e2e",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage --collectCoverageFrom='src/**/*.ts'",
     "start": "node server.js",
     "dev": "ts-node src/server.ts",
     "build:ts": "tsc",
@@ -33,8 +38,13 @@
   "description": "",
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
     "@types/node": "^26.0.1",
+    "@types/supertest": "^7.2.0",
+    "jest": "^30.4.2",
     "localtunnel": "^2.0.2",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.11",
     "ts-loader": "^9.6.2",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
