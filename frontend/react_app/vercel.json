@@ -3,10 +3,6 @@
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "create-react-app",
   "outputDirectory": "build",
-  "env": {
-    "REACT_APP_API_URL": "@api_url",
-    "REACT_APP_ENVIRONMENT": "production"
-  },
   "headers": [
     {
       "source": "/(.*)",
@@ -32,9 +28,9 @@
       "source": "/api/:path*",
       "destination": "https://biketaxi-api-prod.onrender.com/api/:path*"
     },
-     {
+    {
       "source": "/(.*)",
       "destination": "/index.html"
-      }
+    }
   ]
 }
