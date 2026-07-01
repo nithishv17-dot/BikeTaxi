@@ -32,9 +32,5 @@
       "source": "/api/:path*",
       "destination": "https://biketaxi-api-prod.onrender.com/api/:path*"
     }
-  ],
-  "regions": [
-    "iad1",
-    "sfo1"
   ]
 }
