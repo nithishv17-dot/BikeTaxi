@@ -31,6 +31,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://biketaxi-api-prod.onrender.com/api/:path*"
-    }
+    },
+     {
+      "source": "/(.*)",
+      "destination": "/index.html"
+      }
   ]
 }
