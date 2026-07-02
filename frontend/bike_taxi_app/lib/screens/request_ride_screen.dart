@@ -653,6 +653,64 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
     );
   }
 
+  Widget _buildPaymentChip(String label, IconData icon) {
+    final isSelected = selectedPaymentMethod == label;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          selectedPaymentMethod = label;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFF4A261).withOpacity(0.16) : Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: isSelected ? const Color(0xFFF4A261) : Colors.white.withOpacity(0.12)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: isSelected ? const Color(0xFFF4A261) : Colors.white70),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? const Color(0xFFF4A261) : Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOfferPill(String code, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4A261).withOpacity(0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFF4A261).withOpacity(0.26)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.local_offer_rounded, size: 16, color: Color(0xFFF4A261)),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(code, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFFF4A261))),
+              Text(label, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPreviewMap() {
     final previewPoints = <LatLng>[
       if (pickupLat != null && pickupLng != null)
@@ -1303,317 +1361,326 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
   @override
   Widget build(BuildContext context) {
     Widget content = PremiumBackdrop(
-      accentColor: AppPalette.primary,
-      secondaryColor: AppPalette.secondary,
+      accentColor: const Color(0xFFF4A261),
+      secondaryColor: const Color(0xFFFFB86B),
       child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-          children: [
-            // 1. Trip Preview Header & Map at the very top
-            const Text(
-              "Trip Preview",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: AppPalette.slate900,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildPreviewMap(),
-            const SizedBox(height: 16),
-
-            // 2. Plan Your Ride Form Card
-            RevealMotion(
-              delay: const Duration(milliseconds: 140),
-              child: ReflectionCard(
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Plan Your Ride",
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: AppPalette.slate900,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      "Type addresses and pick one live Photon result for each stop.",
-                      style: TextStyle(
-                        color: AppPalette.slate500,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    _buildLocationSearchField(
-                      label: "Pickup Location",
-                      hintText: "Start typing pickup address",
-                      helperText:
-                          "Suggestions appear automatically after 3 characters.",
-                      controller: pickupController,
-                      onChanged: _onPickupChanged,
-                      isSearching: isSearchingPickup,
-                      errorText: pickupError,
-                      icon: Icons.my_location_rounded,
-                      hasSelectedLocation: pickupAddress != null,
-                    ),
-                    if (pickupAddress == null) ...[
-                      const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            const Text(
-                              "Quick: ",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppPalette.slate500,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ActionChip(
-                                avatar: Icon(
-                                  isResolvingCurrentLocation
-                                      ? Icons.hourglass_top_rounded
-                                      : Icons.gps_fixed_rounded,
-                                  size: 12,
-                                  color: AppPalette.primary,
-                                ),
-                                label: Text(
-                                  isResolvingCurrentLocation
-                                      ? "Locating..."
-                                      : "Use Live Location",
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                padding: EdgeInsets.zero,
-                                onPressed: isResolvingCurrentLocation
-                                    ? null
-                                    : () async {
-                                        setState(() {
-                                          message = "Getting your location...";
-                                        });
-                                        final pos =
-                                            await LocationService.getCurrentPosition();
-                                        if (!mounted) return;
-                                        if (pos != null) {
-                                          await _selectCurrentPickupAddress(
-                                            pos,
-                                          );
-                                        } else {
-                                          setState(() {
-                                            message =
-                                                "Could not get your location. Please allow location access.";
-                                          });
-                                        }
-                                      },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    _buildSuggestionsList(pickupSuggestions, isPickup: true),
-                    const SizedBox(height: 15),
-                    _buildLocationSearchField(
-                      label: "Drop Location",
-                      hintText: "Start typing destination address",
-                      helperText:
-                          "Suggestions appear automatically after 3 characters.",
-                      controller: destinationController,
-                      onChanged: _onDropChanged,
-                      isSearching: isSearchingDrop,
-                      errorText: dropError,
-                      icon: Icons.flag_rounded,
-                      hasSelectedLocation: dropAddress != null,
-                    ),
-                    if (dropAddress == null) ...[
-                      const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            const Text(
-                              "Quick: ",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppPalette.slate500,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            ...[
-                              {
-                                "name": "Home",
-                                "address":
-                                    "123 Green Glen Layout, Outer Ring Road, Bangalore",
-                                "lat": 12.9279,
-                                "lng": 77.6271,
-                                "placeId": "home_preset",
-                              },
-                              {
-                                "name": "Office",
-                                "address":
-                                    "Embassy TechVillage, Bellandur, Bangalore",
-                                "lat": 12.9784,
-                                "lng": 77.6408,
-                                "placeId": "office_preset",
-                              },
-                              {
-                                "name": "Metro Station",
-                                "address":
-                                    "Indiranagar Metro Station, Bangalore",
-                                "lat": 12.9716,
-                                "lng": 77.5946,
-                                "placeId": "metro_preset",
-                              },
-                              {
-                                "name": "Airport",
-                                "address":
-                                    "Kempegowda International Airport, Bangalore",
-                                "lat": 13.1986,
-                                "lng": 77.7066,
-                                "placeId": "airport_preset",
-                              },
-                            ].map(
-                              (preset) => Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: ActionChip(
-                                  avatar: const Icon(
-                                    Icons.place_rounded,
-                                    size: 12,
-                                    color: AppPalette.accent,
-                                  ),
-                                  label: Text(
-                                    preset["name"] as String,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  onPressed: () {
-                                    _selectSuggestion({
-                                      "placeId": preset["placeId"],
-                                      "address": preset["address"],
-                                      "lat": preset["lat"],
-                                      "lng": preset["lng"],
-                                    }, isPickup: false);
-                                  },
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                "Good Evening 👋",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white70,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    _buildSuggestionsList(dropSuggestions, isPickup: false),
-                    const SizedBox(height: 20),
-                    const Text(
-                      "Booking Mode",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: AppPalette.slate900,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SegmentedButton<String>(
-                      style: ButtonStyle(
-                        textStyle: WidgetStateProperty.all(
-                          const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        side: WidgetStateProperty.all(
-                          BorderSide(
-                            color: AppPalette.primary.withOpacity(0.26),
-                          ),
-                        ),
-                      ),
-                      segments: const [
-                        ButtonSegment<String>(
-                          value: "normal",
-                          label: Text("Normal"),
-                          icon: Icon(Icons.local_taxi_rounded),
-                        ),
-                        ButtonSegment<String>(
-                          value: "negotiation",
-                          label: Text("Negotiation"),
-                          icon: Icon(Icons.sell_rounded),
-                        ),
-                      ],
-                      selected: {bookingMode},
-                      onSelectionChanged: (selection) {
-                        setState(() {
-                          bookingMode = selection.first;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    GestureDetector(
-                      onTap: estimatedFare == null ? null : _showFareBreakdown,
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.white.withOpacity(0.06),
-                              Colors.white.withOpacity(0.02),
+                              SizedBox(height: 4),
+                              Text(
+                                "Nithish",
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ],
                           ),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.08),
-                          ),
                         ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.payments_outlined,
-                              color: AppPalette.slate600,
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.10),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white.withOpacity(0.12)),
+                          ),
+                          child: const Icon(Icons.notifications_none_rounded, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(0.10)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.location_on_rounded, color: Color(0xFFF4A261), size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Current Location",
+                                  style: TextStyle(fontSize: 11, color: Colors.white70),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  "Coimbatore",
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        "Estimated Fare",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          color: AppPalette.slate900,
-                                        ),
-                                      ),
-                                      if (estimatedFare != null)
-                                        const Text(
-                                          "Tap for breakdown",
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppPalette.primary,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    estimatedFare == null
-                                        ? "Select pickup and drop to calculate fare."
-                                        : "Approx. Rs. ${estimatedFare!.toStringAsFixed(2)}",
-                                    style: const TextStyle(
-                                      color: AppPalette.slate600,
-                                      fontWeight: FontWeight.w600,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildPreviewMap(),
+                  ],
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 120),
+                      child: ReflectionCard(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    "Where are you going?",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
                                     ),
                                   ),
+                                ),
+                                if (pickupAddress != null && dropAddress != null)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF4A261).withOpacity(0.14),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: const Text(
+                                      "Ready",
+                                      style: TextStyle(
+                                        color: Color(0xFFF4A261),
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            _buildLocationSearchField(
+                              label: "Pickup",
+                              hintText: "Enter pickup location",
+                              helperText: "Tap a suggestion or use your live location",
+                              controller: pickupController,
+                              onChanged: _onPickupChanged,
+                              isSearching: isSearchingPickup,
+                              errorText: pickupError,
+                              icon: Icons.my_location_rounded,
+                              hasSelectedLocation: pickupAddress != null,
+                            ),
+                            if (pickupAddress == null) ...[
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  ActionChip(
+                                    avatar: const Icon(Icons.gps_fixed_rounded, size: 16, color: Color(0xFFF4A261)),
+                                    label: const Text("Use Live Location"),
+                                    onPressed: isResolvingCurrentLocation
+                                        ? null
+                                        : () async {
+                                            setState(() {
+                                              message = "Getting your location...";
+                                            });
+                                            final pos = await LocationService.getCurrentPosition();
+                                            if (!mounted) return;
+                                            if (pos != null) {
+                                              await _selectCurrentPickupAddress(pos);
+                                            } else {
+                                              setState(() {
+                                                message = "Could not get your location. Please allow location access.";
+                                              });
+                                            }
+                                          },
+                                  ),
+                                ],
+                              ),
+                            ],
+                            _buildSuggestionsList(pickupSuggestions, isPickup: true),
+                            const SizedBox(height: 10),
+                            _buildLocationSearchField(
+                              label: "Drop",
+                              hintText: "Enter destination",
+                              helperText: "Choose a drop point to continue",
+                              controller: destinationController,
+                              onChanged: _onDropChanged,
+                              isSearching: isSearchingDrop,
+                              errorText: dropError,
+                              icon: Icons.flag_rounded,
+                              hasSelectedLocation: dropAddress != null,
+                            ),
+                            _buildSuggestionsList(dropSuggestions, isPickup: false),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        bookingMode = bookingMode == "normal" ? "negotiation" : "normal";
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.06),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: Colors.white.withOpacity(0.10)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            bookingMode == "normal" ? Icons.flash_on_rounded : Icons.handshake_rounded,
+                                            color: const Color(0xFFF4A261),
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              bookingMode == "normal" ? "Normal Booking" : "Negotiation Mode",
+                                              style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                                            ),
+                                          ),
+                                          const Icon(Icons.swap_horiz_rounded, color: Colors.white70),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 180),
+                      child: ReflectionCard(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    "Estimated Fare",
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: estimatedFare == null ? null : _showFareBreakdown,
+                                  child: Text(
+                                    estimatedFare == null ? "Tap to calculate" : "Breakdown",
+                                    style: const TextStyle(color: Color(0xFFF4A261), fontWeight: FontWeight.w800),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                const Icon(Icons.currency_rupee_rounded, color: Color(0xFFF4A261), size: 28),
+                                const SizedBox(width: 8),
+                                Text(
+                                  estimatedFare == null ? "--" : estimatedFare!.toStringAsFixed(2),
+                                  style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: Colors.white),
+                                ),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Text(
+                                    "Includes platform fee and GST",
+                                    style: TextStyle(fontSize: 12, color: Colors.white70),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 220),
+                      child: ReflectionCard(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Payment",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                _buildPaymentChip("Cash", Icons.money_rounded),
+                                _buildPaymentChip("UPI", Icons.qr_code_rounded),
+                                _buildPaymentChip("Card", Icons.credit_card_rounded),
+                                _buildPaymentChip("Wallet", Icons.account_balance_wallet_rounded),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    RevealMotion(
+                      delay: const Duration(milliseconds: 260),
+                      child: ReflectionCard(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Offers",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
+                            ),
+                            const SizedBox(height: 10),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _buildOfferPill("SAVE20", "Flat ₹20 Off"),
+                                  const SizedBox(width: 10),
+                                  _buildOfferPill("FIRST50", "50% Off First Ride"),
+                                  const SizedBox(width: 10),
+                                  _buildOfferPill("RIDEPASS", "Ride Pass Available"),
                                 ],
                               ),
                             ),
@@ -1621,95 +1688,69 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedPaymentMethod,
-                      decoration: const InputDecoration(
-                        labelText: "Payment Method",
-                        prefixIcon: Icon(Icons.account_balance_wallet_rounded),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: "Cash", child: Text("Cash")),
-                        DropdownMenuItem(value: "UPI", child: Text("UPI")),
-                        DropdownMenuItem(value: "Card", child: Text("Card")),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() {
-                          selectedPaymentMethod = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 16),
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 240),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
-                            color: AppPalette.primary.withOpacity(
-                              canSubmit ? 0.28 : 0.14,
-                            ),
-                            blurRadius: 20,
+                            color: const Color(0xFFF4A261).withOpacity(canSubmit ? 0.26 : 0.12),
+                            blurRadius: 24,
                             offset: const Offset(0, 10),
                           ),
                         ],
                       ),
-                      child: ElevatedButton(
+                      child: ElevatedButton.icon(
                         onPressed: canSubmit ? requestRide : null,
                         style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 54),
+                          minimumSize: const Size(double.infinity, 58),
+                          backgroundColor: const Color(0xFFF4A261),
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                          elevation: 0,
                         ),
-                        child: isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.1,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                bookingMode == "negotiation"
-                                    ? "Negotiate Ride"
-                                    : "Book Ride",
-                              ),
+                        icon: isLoading
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.black))
+                            : const Icon(Icons.bike_scooter_rounded),
+                        label: Text(
+                          isLoading
+                              ? "Searching riders..."
+                              : bookingMode == "negotiation"
+                                  ? "Request Negotiation"
+                                  : "Book Ride",
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                        ),
                       ),
+                    ),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 260),
+                      child: message.isEmpty
+                          ? const SizedBox.shrink()
+                          : Padding(
+                              key: ValueKey(message),
+                              padding: const EdgeInsets.only(top: 16),
+                              child: ReflectionCard(
+                                padding: const EdgeInsets.all(16),
+                                borderRadius: BorderRadius.circular(18),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.info_outline_rounded, color: Color(0xFFF4A261)),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        message,
+                                        style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                     ),
                   ],
                 ),
               ),
-            ),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 260),
-              child: message.isEmpty
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      key: ValueKey(message),
-                      padding: const EdgeInsets.only(top: 16),
-                      child: ReflectionCard(
-                        padding: const EdgeInsets.all(16),
-                        borderRadius: BorderRadius.circular(18),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.info_outline_rounded,
-                              color: AppPalette.slate600,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                message,
-                                style: const TextStyle(
-                                  color: AppPalette.slate600,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
             ),
           ],
         ),
