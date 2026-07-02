@@ -186,7 +186,36 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
         cos(lat1) * cos(lat2) * sin(dLng / 2) * sin(dLng / 2);
     final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
     final double distanceKm = earthRadiusKm * c;
-    return (40 + (distanceKm * 12)).clamp(40, 100000).toDouble();
+
+    // New pricing engine matching Rapido/Uber Moto
+    const double baseFare = 15;
+    const double baseDistanceKm = 1.5;
+    const double perKmRate = 9;
+    const double aboveTenKmRate = 8;
+    const double platformFee = 5;
+    const double gstPercent = 5;
+
+    // Calculate distance fare
+    double distanceFare = 0;
+    if (distanceKm > baseDistanceKm) {
+      final double remainingDistance = distanceKm - baseDistanceKm;
+      if (distanceKm <= 10) {
+        distanceFare = remainingDistance * perKmRate;
+      } else {
+        final double firstSegment = 8.5 * perKmRate; // 1.5 to 10 km
+        final double remainingSegment = distanceKm - 10;
+        final double secondSegment = remainingSegment * aboveTenKmRate;
+        distanceFare = firstSegment + secondSegment;
+      }
+    }
+
+    // Calculate total
+    final double subtotal = baseFare + distanceFare;
+    final double beforeGst = subtotal + platformFee;
+    final double gst = beforeGst * (gstPercent / 100);
+    final double totalFare = beforeGst + gst;
+
+    return totalFare.clamp(40, 100000).toDouble();
   }
 
   void _clearPickupSelection() {
