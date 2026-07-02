@@ -50655,18 +50655,22 @@ gKb(){var s,r=this,q=!1
 if(!r.k1)if(!r.dx)if(!r.dy)if(!r.gHK()){s=r.d.a.a
 if(r.zG(r.at,s,r.ay,r.ch)){q=r.e.a.a
 q=r.zG(r.CW,q,r.cy,r.db)}}return q},
-gtp(){var s,r,q,p,o,n=this,m=n.ay
-if(m==null||n.ch==null||n.cy==null||n.db==null)return null
-s=n.cy
+gtp(){var s,r,q,p,o,n,m,l,k=this,j=k.ay
+if(j==null||k.ch==null||k.cy==null||k.db==null)return null
+s=k.cy
 s.toString
-r=n.db
+r=k.db
 r.toString
-q=n.ch
+q=k.ch
 q.toString
-p=(s-m)*3.141592653589793/180/2
+p=(s-j)*3.141592653589793/180/2
 q=(r-q)*3.141592653589793/180/2
-o=Math.sin(p)*Math.sin(p)+Math.cos(m*3.141592653589793/180)*Math.cos(s*3.141592653589793/180)*Math.sin(q)*Math.sin(q)
-return B.d.du(40+6371*(2*Math.atan2(Math.sqrt(o),Math.sqrt(1-o)))*12,40,1e5)},
+o=Math.sin(p)*Math.sin(p)+Math.cos(j*3.141592653589793/180)*Math.cos(s*3.141592653589793/180)*Math.sin(q)*Math.sin(q)
+n=6371*(2*Math.atan2(Math.sqrt(o),Math.sqrt(1-o)))
+if(n>1.5)m=n<=10?(n-1.5)*9:76.5+(n-10)*8
+else m=0
+l=15+m+5
+return B.d.du(l+l*0.05,40,1e5)},
 zG(a,b,c,d){var s=!1
 if(a!=null)if(c!=null)if(d!=null)if(B.c.cF(b)===a)s=c>=-90&&c<=90&&d>=-180&&d<=180
 return s},
