@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const authMiddleware = require("../middleware/authMiddleware");
 
@@ -24,7 +25,14 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    const user = new User({ name, phone, password, role: role || "user" });
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = new User({
+      name,
+      phone,
+      password: hashedPassword,
+      role: role || "user"
+    });
     await user.save();
 
     return res.status(201).json({
@@ -58,7 +66,9 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    if (user.password !== password) {
+    const passwordMatches = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatches) {
       return res.status(401).json({
         message: "Invalid password"
       });
