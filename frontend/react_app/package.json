@@ -48,7 +48,6 @@
     "lucide-react": "^1.22.0",
     "postcss": "^8.5.16",
     "react-router-dom": "^7.18.1",
-    "tailwindcss": "^4.3.2",
     "zustand": "^5.0.14"
   }
 }
