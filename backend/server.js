@@ -7,6 +7,9 @@ const rideController = require("./controllers/rideController");
 const ridesRoutes = require("./routes/rideRoutes");
 const userRoutes = require("./routes/userRoutes");
 const driverRoutes = require("./routes/driverRoutes");
+const fareRoutes = require("./routes/fareRoutes");
+const adminFareRoutes = require("./routes/adminFareRoutes");
+const receiptRoutes = require("./routes/receiptRoutes");
 const cors = require("cors");
 
 const app = express();
@@ -32,6 +35,9 @@ mongoose.connect(process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/biketaxi"
 app.use("/api/users",userRoutes);
 app.use("/api/rides", ridesRoutes);
 app.use("/api/drivers",driverRoutes);
+app.use("/api/fare", fareRoutes);
+app.use("/api/admin/fare", adminFareRoutes);
+app.use("/api/receipts", receiptRoutes);
 
 /* ---------------- SOCKET SERVER ---------------- */
 

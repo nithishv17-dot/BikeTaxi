@@ -1,5 +1,6 @@
 const Ride = require("../models/Ride");
 const User = require("../models/User");
+const { calculateFare } = require("../services/fareService");
 
 const VALID_PAYMENT_METHODS = new Set(["Cash", "UPI", "Card"]);
 const VALID_BOOKING_MODES = new Set(["normal", "negotiation"]);
@@ -55,14 +56,22 @@ const calculateDistanceKm = (pickupLat, pickupLng, dropLat, dropLng) => {
   return earthRadiusKm * c;
 };
 
-const calculateEstimatedFare = (pickupLat, pickupLng, dropLat, dropLng) => {
+const calculateEstimatedFare = async (pickupLat, pickupLng, dropLat, dropLng) => {
   const distanceKm = calculateDistanceKm(
     pickupLat,
     pickupLng,
     dropLat,
     dropLng
   );
-  return Math.max(40, Math.round((40 + distanceKm * 12) * 100) / 100);
+
+  const fare = await calculateFare({
+    distanceKm,
+    durationMinutes: 0,
+    surgeMultiplier: 1,
+    walletAmount: 0,
+  });
+
+  return fare.totalFare;
 };
 
 const sortOffers = (offers = []) =>
@@ -238,12 +247,12 @@ exports.requestRide = async (req, res) => {
 
     const estimatedFare =
       parseFare(req.body.estimatedFare ?? req.body.fare) ??
-      calculateEstimatedFare(
+      (await calculateEstimatedFare(
         pickupLatitude,
         pickupLongitude,
         dropLatitude,
         dropLongitude
-      );
+      ));
 
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
@@ -447,12 +456,21 @@ exports.completeRide = async (req, res) => {
       });
     }
 
+    const fareBreakdown = await calculateFare({
+      distanceKm: req.body.distanceKm ?? 0,
+      durationMinutes: req.body.durationMinutes ?? 0,
+      surgeMultiplier: req.body.surgeMultiplier ?? 1,
+      couponCode: req.body.couponCode,
+      walletAmount: req.body.walletAmount ?? 0,
+      rideId: ride._id,
+      firstRideOnly: Boolean(req.body.firstRideOnly),
+    });
+
     ride.status = "completed";
-    ride.finalFare =
-      parseFare(ride.finalFare) ??
-      parseFare(ride.offeredFare) ??
-      parseFare(ride.estimatedFare) ??
-      0;
+    ride.finalFare = fareBreakdown.totalFare;
+    ride.estimatedFare = fareBreakdown.totalFare;
+    ride.initialFare = fareBreakdown.totalFare;
+    ride.offeredFare = fareBreakdown.totalFare;
     await ride.save();
 
     if (ride.driverId) {
@@ -467,7 +485,8 @@ exports.completeRide = async (req, res) => {
 
     return res.status(200).json({
       message: "Ride completed successfully",
-      ride
+      ride,
+      fare: fareBreakdown
     });
   } catch (error) {
     console.log("COMPLETE RIDE ERROR:", error);
@@ -552,6 +571,12 @@ exports.payRide = async (req, res) => {
     if (!ride) {
       return res.status(404).json({
         message: "Ride not found"
+      });
+    }
+
+    if (ride.status === "cancelled") {
+      return res.status(400).json({
+        message: "Cancelled rides cannot be paid"
       });
     }
 
