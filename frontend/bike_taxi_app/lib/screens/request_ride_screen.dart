@@ -43,6 +43,8 @@ class _RequestRideScreenState extends State<RequestRideScreen>
   String selectedPaymentMethod = "Cash";
   String bookingMode = "normal";
   final TextEditingController _offerController = TextEditingController();
+  final FocusNode _pickupFocusNode = FocusNode();
+  bool _showGpsPickupSuggestion = false;
   String pickupInput = "";
   String dropInput = "";
   String? pickupAddress;
@@ -153,6 +155,14 @@ class _RequestRideScreenState extends State<RequestRideScreen>
       curve: const Interval(0.55, 1.0, curve: Curves.easeOutCubic),
     );
 
+    _pickupFocusNode.addListener(() {
+      if (!mounted) return;
+      setState(() {
+        _showGpsPickupSuggestion =
+            _pickupFocusNode.hasFocus && pickupAddress == null;
+      });
+    });
+
     _startDriversPolling();
     _loadCurrentLocation();
 
@@ -194,6 +204,7 @@ class _RequestRideScreenState extends State<RequestRideScreen>
     _contentAnimCtrl.dispose();
     _sheetCtrl.dispose();
     _offerController.dispose();
+    _pickupFocusNode.dispose();
     super.dispose();
   }
 
@@ -403,7 +414,7 @@ class _RequestRideScreenState extends State<RequestRideScreen>
     _phase = _BookingPhase.initial;
     if (_sheetCtrl.isAttached) {
       _sheetCtrl.animateTo(
-        0.30,
+        0.22,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
@@ -1099,47 +1110,73 @@ class _RequestRideScreenState extends State<RequestRideScreen>
           // Pickup field
           _buildCompactLocationField(
             controller: pickupController,
-            hintText: "Pickup location",
+            hintText: "Pickup Location",
             onChanged: _onPickupChanged,
             isSearching: isSearchingPickup,
             icon: Icons.my_location_rounded,
             iconColor: const Color(0xFF16A34A),
             isSelected: pickupAddress != null,
             errorText: pickupError,
+            focusNode: _pickupFocusNode,
           ),
-          if (pickupAddress == null && currentLat != null && currentLng != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4, left: 4),
-              child: GestureDetector(
+          // GPS first-suggestion when pickup is focused
+          if (_showGpsPickupSuggestion &&
+              currentLat != null &&
+              currentLng != null &&
+              pickupSuggestions.isEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1C1C).withOpacity(0.95),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
+              ),
+              child: ListTile(
+                dense: true,
+                leading: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16A34A).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.gps_fixed_rounded,
+                    size: 16,
+                    color: Color(0xFF16A34A),
+                  ),
+                ),
+                title: const Text(
+                  "Current Location",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  isResolvingCurrentLocation
+                      ? "Detecting your location..."
+                      : "Use live GPS location",
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.45),
+                    fontSize: 11,
+                  ),
+                ),
                 onTap: isResolvingCurrentLocation
                     ? null
                     : () async {
-                        setState(() => message = "Getting your location...");
+                        _pickupFocusNode.unfocus();
+                        setState(() {
+                          _showGpsPickupSuggestion = false;
+                          message = "Getting your location...";
+                        });
                         final pos = await LocationService.getCurrentPosition();
                         if (!mounted) return;
                         if (pos != null) {
                           await _selectCurrentPickupAddress(pos);
                         }
                       },
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.gps_fixed_rounded,
-                      size: 13,
-                      color: const Color(0xFFF4A261).withOpacity(0.8),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      "Use live location",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: const Color(0xFFF4A261).withOpacity(0.9),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           // Suggestions for pickup
@@ -1190,6 +1227,7 @@ class _RequestRideScreenState extends State<RequestRideScreen>
     required Color iconColor,
     required bool isSelected,
     String? errorText,
+    FocusNode? focusNode,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -1211,6 +1249,7 @@ class _RequestRideScreenState extends State<RequestRideScreen>
             child: TextField(
               controller: controller,
               onChanged: onChanged,
+              focusNode: focusNode,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 14,
@@ -1354,11 +1393,11 @@ class _RequestRideScreenState extends State<RequestRideScreen>
   Widget _buildDraggableSheet(BuildContext context) {
     return DraggableScrollableSheet(
       controller: _sheetCtrl,
-      initialChildSize: 0.30,
-      minChildSize: 0.22,
+      initialChildSize: 0.22,
+      minChildSize: 0.16,
       maxChildSize: 0.90,
       snap: true,
-      snapSizes: const [0.30, 0.60, 0.90],
+      snapSizes: const [0.22, 0.60, 0.90],
       builder: (context, scrollController) {
         return ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -1411,11 +1450,21 @@ class _RequestRideScreenState extends State<RequestRideScreen>
           ),
         ),
 
-        // Always visible: Segmented booking mode control
+        // Booking Mode label + segmented control (always visible)
+        Text(
+          "Booking Mode",
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Colors.white.withOpacity(0.45),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
         _buildSegmentedControl(),
         const SizedBox(height: 14),
 
-        // Staggered common rows
+        // Staggered common rows (hidden until route is ready)
         _buildStaggered(_rideTypeAnim, _buildRideTypeRow()),
         _buildStaggered(_etaAnim, _buildEtaDistanceRow()),
 
@@ -1443,14 +1492,14 @@ class _RequestRideScreenState extends State<RequestRideScreen>
                 children: bookingMode == "normal"
                     ? [
                         _buildFareRow(),
-                        _buildPaymentRow(),
+                        _buildPaymentDropdown(),
                         _buildBookButton(),
                       ]
                     : [
                         _buildSuggestedFareRow(),
-                        _buildOfferInputRow(),
-                        _buildPaymentRow(),
-                        _buildSendOfferButton(),
+                        _buildNegotiationInfoCard(),
+                        _buildPaymentDropdown(),
+                        _buildNegotiateFareButton(),
                       ],
               ),
             ),
@@ -1641,8 +1690,7 @@ class _RequestRideScreenState extends State<RequestRideScreen>
   Widget _buildRideTypeRow() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
           Text(
             "Ride Type",
@@ -1652,22 +1700,8 @@ class _RequestRideScreenState extends State<RequestRideScreen>
               color: Colors.white.withOpacity(0.5),
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _rideTypeChip(
-                Icons.directions_bike_rounded,
-                "Bike",
-                true,
-              ),
-              const SizedBox(width: 10),
-              _rideTypeChip(
-                Icons.electric_bike_rounded,
-                "E-Bike",
-                false,
-              ),
-            ],
-          ),
+          const SizedBox(width: 12),
+          _rideTypeChip(Icons.directions_bike_rounded, "Bike", true),
         ],
       ),
     );
@@ -1843,7 +1877,19 @@ class _RequestRideScreenState extends State<RequestRideScreen>
     );
   }
 
-  Widget _buildPaymentRow() {
+  Widget _buildPaymentDropdown() {
+    const options = <String>["Cash", "UPI", "Card"];
+    IconData _iconFor(String opt) {
+      switch (opt) {
+        case "UPI":
+          return Icons.qr_code_rounded;
+        case "Card":
+          return Icons.credit_card_rounded;
+        default:
+          return Icons.money_rounded;
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -1858,59 +1904,63 @@ class _RequestRideScreenState extends State<RequestRideScreen>
             ),
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _paymentChip("Cash", Icons.money_rounded),
-              _paymentChip("UPI", Icons.qr_code_rounded),
-              _paymentChip("Card", Icons.credit_card_rounded),
-              _paymentChip("Wallet", Icons.account_balance_wallet_rounded),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _paymentChip(String label, IconData icon) {
-    final isSelected = selectedPaymentMethod == label;
-    return GestureDetector(
-      onTap: () => setState(() => selectedPaymentMethod = label),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFFF4A261).withOpacity(0.14)
-              : Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFFF4A261)
-                : Colors.white.withOpacity(0.10),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 15,
-              color: isSelected
-                  ? const Color(0xFFF4A261)
-                  : Colors.white.withOpacity(0.6),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withOpacity(0.10)),
             ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? const Color(0xFFF4A261) : Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                canvasColor: const Color(0xFF1E2020),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: selectedPaymentMethod,
+                  isExpanded: true,
+                  icon: Padding(
+                    padding: const EdgeInsets.only(right: 14),
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Colors.white.withOpacity(0.45),
+                      size: 20,
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 2,
+                  ),
+                  items: options.map((opt) {
+                    return DropdownMenuItem<String>(
+                      value: opt,
+                      child: Row(
+                        children: [
+                          Icon(
+                            _iconFor(opt),
+                            size: 16,
+                            color: const Color(0xFFF4A261),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            opt,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => selectedPaymentMethod = val);
+                  },
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1964,6 +2014,341 @@ class _RequestRideScreenState extends State<RequestRideScreen>
   }
 
   // ── negotiation mode widgets ───────────────────────────────────────────────
+
+  Widget _buildNegotiationInfoCard() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4A261).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.info_outline_rounded,
+                color: Color(0xFFF4A261),
+                size: 16,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                "Your request will be sent to nearby riders. Drivers can accept your request or respond with a counter-offer. You'll be able to review all responses before confirming your ride.",
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.60),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  height: 1.55,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNegotiateFareButton() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 240),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFF4A261).withOpacity(
+                canSubmit ? 0.28 : 0.08,
+              ),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ElevatedButton.icon(
+          onPressed: canSubmit ? _showNegotiationModal : null,
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 56),
+            backgroundColor: const Color(0xFFF4A261),
+            foregroundColor: Colors.black,
+            disabledBackgroundColor: const Color(0xFFF4A261).withOpacity(0.35),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            elevation: 0,
+          ),
+          icon: const Icon(Icons.handshake_rounded, size: 20),
+          label: const Text(
+            "Negotiate Fare",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showNegotiationModal() {
+    double offerAmount = estimatedFare ?? 100.0;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          void adjustOffer(double delta) {
+            setModalState(() {
+              offerAmount = (offerAmount + delta).clamp(10.0, 10000.0);
+            });
+          }
+
+          Widget quickChip(
+            String label,
+            VoidCallback onTap, {
+            bool isReset = false,
+          }) {
+            return Expanded(
+              child: GestureDetector(
+                onTap: onTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  decoration: BoxDecoration(
+                    color: isReset
+                        ? Colors.white.withOpacity(0.06)
+                        : const Color(0xFFF4A261).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isReset
+                          ? Colors.white.withOpacity(0.10)
+                          : const Color(0xFFF4A261).withOpacity(0.25),
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: isReset
+                            ? Colors.white.withOpacity(0.55)
+                            : const Color(0xFFF4A261),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          return Container(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              MediaQuery.of(ctx).viewInsets.bottom + 28,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xFF141616),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              border: Border.all(color: Colors.white.withOpacity(0.09)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const Text(
+                  "Negotiate Fare",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Suggested: ₹ ${(estimatedFare ?? 0).toStringAsFixed(0)}",
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withOpacity(0.45),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Offer amount + +/- controls
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.10),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => adjustOffer(-10),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.12),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.remove_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Text(
+                              "Your Offer",
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white.withOpacity(0.45),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "₹ ${offerAmount.toStringAsFixed(0)}",
+                              style: const TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => adjustOffer(10),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.12),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.add_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+                // Quick chips
+                Row(
+                  children: [
+                    quickChip("+₹10", () => adjustOffer(10)),
+                    const SizedBox(width: 8),
+                    quickChip("+₹20", () => adjustOffer(20)),
+                    const SizedBox(width: 8),
+                    quickChip("+₹30", () => adjustOffer(30)),
+                    const SizedBox(width: 8),
+                    quickChip(
+                      "Reset",
+                      () => setModalState(
+                        () => offerAmount = estimatedFare ?? 100,
+                      ),
+                      isReset: true,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+                // Send negotiation button
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _offerController.text = offerAmount.toStringAsFixed(0);
+                    _requestRide();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 54),
+                    backgroundColor: const Color(0xFFF4A261),
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.send_rounded, size: 18),
+                  label: Text(
+                    "Send Request  ·  ₹ ${offerAmount.toStringAsFixed(0)}",
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                // Cancel
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(
+                      "Cancel",
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.5),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildSuggestedFareRow() {
     final fare = estimatedFare;
     return Padding(
@@ -2051,156 +2436,4 @@ class _RequestRideScreenState extends State<RequestRideScreen>
     );
   }
 
-  Widget _buildOfferInputRow() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Your Offer",
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Colors.white.withOpacity(0.5),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withOpacity(0.10)),
-            ),
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  child: Text(
-                    "₹",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white.withOpacity(0.6),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: TextField(
-                    controller: _offerController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: false),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: estimatedFare != null
-                          ? "${(estimatedFare! * 0.85).toStringAsFixed(0)}"
-                          : "Enter amount",
-                      hintStyle: TextStyle(
-                        color: Colors.white.withOpacity(0.25),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 18,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    if (estimatedFare != null) {
-                      _offerController.text =
-                          (estimatedFare! * 0.85).toStringAsFixed(0);
-                    }
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      "Suggest",
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFFF4A261).withOpacity(0.8),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            "Tip: A fair offer is typically 10–20% below the suggested fare.",
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.white.withOpacity(0.35),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSendOfferButton() {
-    final offerText = _offerController.text.trim();
-    final offerAmount = double.tryParse(offerText);
-    final isOfferValid = offerAmount != null && offerAmount > 0;
-    final enabled = canSubmit && isOfferValid && !isLoading;
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 8),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 240),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFF4A261).withOpacity(enabled ? 0.28 : 0.08),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: ElevatedButton.icon(
-          onPressed: enabled
-              ? () {
-                  setState(() => message = "");
-                  _requestRide();
-                }
-              : null,
-          style: ElevatedButton.styleFrom(
-            minimumSize: const Size(double.infinity, 56),
-            backgroundColor: const Color(0xFFF4A261),
-            foregroundColor: Colors.black,
-            disabledBackgroundColor: const Color(0xFFF4A261).withOpacity(0.35),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            elevation: 0,
-          ),
-          icon: isLoading
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.black,
-                  ),
-                )
-              : const Icon(Icons.send_rounded, size: 19),
-          label: Text(
-            isLoading
-                ? "Sending offer…"
-                : isOfferValid
-                    ? "Send Offer  ·  ₹ ${offerAmount.toStringAsFixed(0)}"
-                    : "Enter your offer above",
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
-          ),
-        ),
-      ),
-    );
-  }
 }

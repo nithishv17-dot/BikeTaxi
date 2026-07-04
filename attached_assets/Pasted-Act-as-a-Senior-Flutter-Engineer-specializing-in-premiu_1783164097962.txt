@@ -1,0 +1,1027 @@
+Act as a Senior Flutter Engineer specializing in premium mobility applications.
+
+
+
+Redesign and refine the BikeTaxi booking experience while preserving the existing dark theme, component styling, colors, animations, and overall design language.
+
+
+
+This is NOT a redesign. It is a UX refinement.
+
+
+
+==========================================
+
+SCREEN 1 — HOME / LOCATION INPUT
+
+==========================================
+
+
+
+The application opens directly to the booking screen.
+
+
+
+There is no dashboard.
+
+
+
+The home screen consists of:
+
+
+
+• Full-screen interactive map
+
+• Floating Pickup / Drop card
+
+• Partially collapsed draggable bottom sheet
+
+
+
+------------------------------------------
+
+
+
+Pickup / Drop Card
+
+
+
+• Keep the floating card fixed.
+
+• Maintain dark glass design.
+
+• Center placeholder text vertically.
+
+• Improve icon and text alignment.
+
+• Keep equal padding.
+
+
+
+Pickup field placeholder:
+
+
+
+"Pickup Location"
+
+
+
+Drop field placeholder:
+
+
+
+"Where to?"
+
+
+
+------------------------------------------
+
+
+
+Pickup Interaction
+
+
+
+When the Pickup field is tapped:
+
+
+
+Automatically show
+
+
+
+Current Location
+
+
+
+as the first suggestion.
+
+
+
+Display:
+
+
+
+📍 Current Location
+
+
+
+Use live GPS.
+
+
+
+If permission is missing:
+
+
+
+Request location permission first.
+
+
+
+------------------------------------------
+
+
+
+Drop Interaction
+
+
+
+When the user taps Drop,
+
+
+
+show search suggestions.
+
+
+
+After the user selects a destination,
+
+
+
+begin the Route Ready transition.
+
+
+
+==========================================
+
+BOTTOM SHEET
+
+==========================================
+
+
+
+Default collapsed height:
+
+
+
+Approximately 30%.
+
+
+
+The collapsed sheet should contain ONLY:
+
+
+
+• Drag Handle
+
+• Booking Mode title
+
+• Segmented Control
+
+
+
+Do NOT show:
+
+
+
+• Ride Type
+
+• Fare
+
+• ETA
+
+• Distance
+
+• Payment
+
+• Book Ride button
+
+
+
+==========================================
+
+BOOKING MODE
+
+==========================================
+
+
+
+Replace any switch or toggle with a segmented control.
+
+
+
+Display:
+
+
+
+┌───────────────────────────────┐
+
+│  ✓ Normal   |  Negotiation    │
+
+└───────────────────────────────┘
+
+
+
+Requirements:
+
+
+
+• Only one selection at a time.
+
+• Smooth animated indicator.
+
+• Spring animation.
+
+• 200–300 ms duration.
+
+
+
+Normal is selected by default.
+
+
+
+Do NOT use a toggle switch.
+
+
+
+==========================================
+
+STATE TRANSITION
+
+==========================================
+
+
+
+Trigger:
+
+
+
+User selects Drop Location.
+
+
+
+Do NOT navigate.
+
+
+
+Everything happens on the same screen.
+
+
+
+------------------------------------------
+
+
+
+Stage 1
+
+
+
+Calculate Route
+
+
+
+Duration
+
+
+
+300–600 ms
+
+
+
+Keep current UI unchanged.
+
+
+
+------------------------------------------
+
+
+
+Stage 2
+
+
+
+Animate route onto the map.
+
+
+
+• Draw polyline progressively.
+
+• Fade in pickup marker.
+
+• Fade in destination marker.
+
+• Smoothly fit the camera to the route.
+
+
+
+------------------------------------------
+
+
+
+Stage 3
+
+
+
+Floating card becomes glass.
+
+
+
+Animate only the background.
+
+
+
+100% opacity
+
+
+
+↓
+
+
+
+75% opacity
+
+
+
+Apply backdrop blur.
+
+
+
+Keep:
+
+
+
+• Same position
+
+• Same size
+
+• Editable inputs
+
+
+
+Allow the route to remain visible beneath the card.
+
+
+
+------------------------------------------
+
+
+
+Stage 4
+
+
+
+Automatically expand the bottom sheet.
+
+
+
+Expand:
+
+
+
+30%
+
+
+
+↓
+
+
+
+60%
+
+
+
+Animation:
+
+
+
+Spring
+
+
+
+350–450 ms
+
+
+
+Reveal with staggered animations:
+
+
+
+• Booking Mode
+
+• Ride Type
+
+
+
+Ride Type:
+
+
+
+Bike only
+
+
+
+Remove:
+
+
+
+• E-Bike
+
+
+
+Show:
+
+
+
+ETA
+
+
+
+Distance
+
+
+
+Estimated Fare
+
+
+
+Fare Breakdown
+
+
+
+Payment
+
+
+
+Book Ride
+
+
+
+------------------------------------------
+
+
+
+Stage 5
+
+
+
+Manual Control
+
+
+
+After expansion finishes,
+
+
+
+stop automatic movement.
+
+
+
+Support snap positions:
+
+
+
+30%
+
+
+
+60%
+
+
+
+90%
+
+
+
+The user controls the panel from this point.
+
+
+
+==========================================
+
+PAYMENT
+
+==========================================
+
+
+
+Remove payment chips.
+
+
+
+Do NOT display
+
+
+
+Cash
+
+
+
+UPI
+
+
+
+Card
+
+
+
+as three buttons.
+
+
+
+Replace with
+
+
+
+Payment dropdown.
+
+
+
+Default:
+
+
+
+Cash
+
+
+
+Dropdown options:
+
+
+
+• Cash
+
+• UPI
+
+• Card
+
+
+
+Cash should always be selected initially.
+
+
+
+==========================================
+
+NORMAL MODE
+
+==========================================
+
+
+
+Show
+
+
+
+Ride Type
+
+
+
+Bike
+
+
+
+ETA
+
+
+
+Distance
+
+
+
+Estimated Fare
+
+
+
+Fare Breakdown
+
+
+
+Payment dropdown
+
+
+
+Book Ride
+
+
+
+==========================================
+
+NEGOTIATION MODE
+
+==========================================
+
+
+
+Do NOT display
+
+
+
+Your Offer
+
+
+
+on the main booking panel.
+
+
+
+Instead display:
+
+
+
+Suggested Fare
+
+
+
+Information Card
+
+
+
+Example:
+
+
+
+"Your request will be sent to nearby riders.
+
+
+
+Drivers can accept your request or respond with a counter-offer.
+
+
+
+You'll be able to review all responses before confirming your ride."
+
+
+
+Display
+
+
+
+"Negotiate Fare"
+
+
+
+button.
+
+
+
+When pressed,
+
+
+
+open a modal bottom sheet.
+
+
+
+==========================================
+
+NEGOTIATION MODAL
+
+==========================================
+
+
+
+The modal contains:
+
+
+
+Suggested Fare
+
+
+
+Editable Offer Amount
+
+
+
++ Increase Fare
+
+
+
+− Decrease Fare
+
+
+
+Quick Chips
+
+
+
++₹10
+
+
+
++₹20
+
+
+
++₹30
+
+
+
+Reset
+
+
+
+Send Negotiation Request
+
+
+
+Cancel
+
+
+
+This keeps the main interface clean while preserving the full negotiation workflow.
+
+
+
+==========================================
+
+AFTER SENDING NEGOTIATION
+
+==========================================
+
+
+
+Replace the booking panel content with:
+
+
+
+Negotiation Request Sent
+
+
+
+Show:
+
+
+
+Searching nearby riders...
+
+
+
+Animated progress indicator
+
+
+
+Number of riders notified
+
+
+
+Estimated response time
+
+
+
+Cancel Request button
+
+
+
+==========================================
+
+WHEN RESPONSES ARRIVE
+
+==========================================
+
+
+
+Display a list of rider offers.
+
+
+
+Each card contains:
+
+
+
+Driver Photo
+
+
+
+Driver Name
+
+
+
+Rating
+
+
+
+ETA
+
+
+
+Counter Offer
+
+
+
+Accept
+
+
+
+Reject
+
+
+
+The passenger chooses one offer.
+
+
+
+==========================================
+
+RIDER ASSIGNED
+
+==========================================
+
+
+
+Show:
+
+
+
+Driver Photo
+
+
+
+Driver Name
+
+
+
+Bike Model
+
+
+
+Bike Registration Number
+
+
+
+Rating
+
+
+
+Live Location
+
+
+
+ETA
+
+
+
+OTP
+
+
+
+Call
+
+
+
+Chat
+
+
+
+Share Ride
+
+
+
+==========================================
+
+ANIMATION PRINCIPLES
+
+==========================================
+
+
+
+Never replace the screen.
+
+
+
+Never abruptly rebuild widgets.
+
+
+
+Animate existing components.
+
+
+
+Use staggered animations.
+
+
+
+Maintain spatial continuity.
+
+
+
+Target 60 FPS.
+
+
+
+Prefer spring animations.
+
+
+
+The UX should guide the user naturally through:
+
+
+
+Select Destination
+
+
+
+↓
+
+
+
+Route Calculated
+
+
+
+↓
+
+
+
+Route Drawn
+
+
+
+↓
+
+
+
+Floating Card Becomes Glass
+
+
+
+↓
+
+
+
+Bottom Sheet Expands
+
+
+
+↓
+
+
+
+User Takes Control
+
+
+
+↓
+
+
+
+Choose Booking Mode
+
+
+
+↓
+
+
+
+Book Ride or Negotiate Fare
+
+
+
+↓
+
+
+
+Driver Matching
+
+
+
+↓
+
+
+
+Ride Assigned
+
+
+
+The final experience should feel calm, premium, modern, and intuitive while maintaining the existing BikeTaxi design language.
+
+
+
+==========================================
+
+COLLAPSED BOTTOM SHEET REFINEMENT
+
+==========================================
+
+
+
+Refine the collapsed state of the draggable bottom sheet.
+
+
+
+The collapsed sheet should be more compact and occupy less vertical space.
+
+
+
+Requirements:
+
+
+
+• Reduce the collapsed height by approximately 20–30%.
+
+• Keep only the following elements visible:
+
+  - Drag Handle
+
+  - Booking Mode segmented control (Normal / Negotiation)
+
+
+
+Remove all unnecessary empty vertical spacing.
+
+
+
+Center the segmented control vertically inside the collapsed sheet.
+
+
+
+The segmented control should span approximately
