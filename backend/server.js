@@ -1,6 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const http = require("http");
+const path = require("path");
 const { Server } = require("socket.io");
 require("dotenv").config();
 const rideController = require("./controllers/rideController");
@@ -65,10 +66,19 @@ setInterval(async () => {
   }
 }, 10000);
 
+/* ---------------- STATIC FRONTEND ---------------- */
+
+const frontendBuildPath = path.join(__dirname, "../frontend/bike_taxi_app/build/web");
+app.use(express.static(frontendBuildPath));
+
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(frontendBuildPath, "index.html"));
+});
+
 /* ---------------- START SERVER ---------------- */
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT,()=>{
+server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
 });
