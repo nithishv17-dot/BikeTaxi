@@ -1,0 +1,1 @@
+- [Flutter Build in Replit](flutter-build.md) — Flutter installed via Nix `flutter` package (v3.32.0, Dart 3.8.0); pubspec sdk must be `^3.5.0` not `^3.11.1`
