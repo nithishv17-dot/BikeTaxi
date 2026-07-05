@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -1095,6 +1096,374 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     );
   }
 
+  // ── driver assigned card (rider view, status = accepted) ─────────────────
+  Widget _buildDriverAssignedCard({
+    required Map<String, dynamic> driverMap,
+    required String otp,
+    required String fare,
+    required String pickupAddress,
+    required String dropAddress,
+  }) {
+    final name = driverMap["name"]?.toString() ?? "Captain";
+    final phone = driverMap["phone"]?.toString() ?? "";
+    final bikeModel = driverMap["bikeModel"]?.toString() ??
+        driverMap["vehicleModel"]?.toString() ??
+        "Bike";
+    final registration = driverMap["registrationNumber"]?.toString() ??
+        driverMap["vehicleNumber"]?.toString() ??
+        "N/A";
+    final rating = driverMap["rating"]?.toString() ?? "4.8";
+    final initials = name
+        .trim()
+        .split(" ")
+        .where((w) => w.isNotEmpty)
+        .map((w) => w[0])
+        .take(2)
+        .join()
+        .toUpperCase();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141616),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFF4A261).withOpacity(0.28)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF4A261).withOpacity(0.07),
+            blurRadius: 28,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header bar
+          Container(
+            padding: const EdgeInsets.fromLTRB(18, 13, 18, 13),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4A261).withOpacity(0.07),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              border: Border(
+                bottom: BorderSide(
+                  color: const Color(0xFFF4A261).withOpacity(0.15),
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF4ADE80),
+                  size: 17,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  "Driver Assigned · On the way",
+                  style: TextStyle(
+                    color: Color(0xFF4ADE80),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4A261).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    "₹ $fare",
+                    style: const TextStyle(
+                      color: Color(0xFFF4A261),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                // Driver profile row
+                Row(
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF4A261).withOpacity(0.14),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFF4A261).withOpacity(0.38),
+                          width: 2,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          initials.isEmpty ? "C" : initials,
+                          style: const TextStyle(
+                            color: Color(0xFFF4A261),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 22,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                color: Color(0xFFF59E0B),
+                                size: 15,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                rating,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.70),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.two_wheeler_rounded,
+                                color: Colors.white.withOpacity(0.45),
+                                size: 14,
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  "$bikeModel  ·  $registration",
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.50),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                // OTP digits
+                if (otp.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 14,
+                      horizontal: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D1A0D),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF16A34A).withOpacity(0.35),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "RIDE OTP",
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFF4ADE80).withOpacity(0.8),
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              "Share with driver to start",
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white.withOpacity(0.35),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: otp.split("").map((digit) {
+                            return Container(
+                              width: 34,
+                              height: 42,
+                              margin: const EdgeInsets.only(left: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF16A34A).withOpacity(0.14),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: const Color(0xFF16A34A).withOpacity(0.38),
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  digit,
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF4ADE80),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+
+                // Action buttons: Call, Chat, Share Ride
+                Row(
+                  children: [
+                    Expanded(
+                      child: _driverActionButton(
+                        icon: Icons.call_rounded,
+                        label: "Call",
+                        color: const Color(0xFF16A34A),
+                        onTap: phone.isNotEmpty
+                            ? () => _copyPhone(phone)
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _driverActionButton(
+                        icon: Icons.chat_bubble_rounded,
+                        label: "Chat",
+                        color: const Color(0xFF2563EB),
+                        onTap: () => _showSnack("In-app chat coming soon"),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _driverActionButton(
+                        icon: Icons.share_rounded,
+                        label: "Share",
+                        color: const Color(0xFF7C3AED),
+                        onTap: () => _shareRide(pickupAddress, dropAddress),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _driverActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.09),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.22)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 5),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _copyPhone(String phone) {
+    Clipboard.setData(ClipboardData(text: phone));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Driver's number copied: $phone"),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void _shareRide(String pickup, String drop) {
+    final text = "🏍 My ride: $pickup → $drop";
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text("Ride details copied to clipboard"),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
   Widget _buildOffersSection() {
     final currentFare =
         (ride?["offeredFare"] ?? ride?["estimatedFare"] ?? ride?["finalFare"])
@@ -1106,30 +1475,61 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Negotiation Offers",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  "Driver Offers",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppPalette.primary.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  "Your offer: ₹$currentFare",
+                  style: const TextStyle(
+                    color: AppPalette.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text("Current fare: Rs. $currentFare"),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: AppPalette.primary.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppPalette.primary.withOpacity(0.3)),
+              color: AppPalette.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppPalette.primary.withOpacity(0.22)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.timer_outlined, color: AppPalette.primary),
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppPalette.primary,
+                  ),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     negotiationSecondsRemaining > 0
-                        ? "Waiting for offers: ${_formatCountdown(negotiationSecondsRemaining)} remaining"
-                        : "Waiting for the server to finalize negotiation status...",
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                        ? "Waiting for offers · ${_formatCountdown(negotiationSecondsRemaining)} remaining"
+                        : "Finalizing negotiation status…",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: AppPalette.primary,
+                    ),
                   ),
                 ),
               ],
@@ -1137,57 +1537,207 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
           ),
           const SizedBox(height: 16),
           if (offers.isEmpty)
-            const Text(
-              "Waiting for driver offers...",
-              style: TextStyle(color: Color(0xFF64748B)),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.hourglass_empty_rounded,
+                    size: 40,
+                    color: Colors.grey.shade400,
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "Waiting for driver offers…",
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             )
           else
             ...offers.map((offer) {
               final offerId = _normalizeOfferId(offer["_id"]) ?? "";
-              final driverName = offer["driverName"]?.toString() ?? "Captain";
-              final driverPhone = offer["driverPhone"]?.toString() ?? "N/A";
+              final driverName =
+                  offer["driverName"]?.toString() ?? "Captain";
               final fare = offer["offeredFare"]?.toString() ?? "0";
+              final rating =
+                  (offer["driverRating"] ?? offer["rating"])?.toString() ??
+                      "4.8";
+              final eta = offer["eta"]?.toString() ?? "~3 min";
+              final initials = driverName.isNotEmpty
+                  ? driverName.trim().split(" ").map((w) => w[0]).take(2).join()
+                  : "C";
 
               return Container(
-                margin: const EdgeInsets.only(top: 12),
+                margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.white.withOpacity(0.09)),
                 ),
-                child: Row(
+                child: Column(
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            driverName,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                    Row(
+                      children: [
+                        // Driver avatar
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: AppPalette.primary.withOpacity(0.18),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppPalette.primary.withOpacity(0.35),
+                              width: 1.5,
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          Text("Phone: $driverPhone"),
-                          const SizedBox(height: 4),
-                          Text("Offer: Rs. $fare"),
-                        ],
-                      ),
+                          child: Center(
+                            child: Text(
+                              initials.toUpperCase(),
+                              style: const TextStyle(
+                                color: AppPalette.primary,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                driverName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                  color: AppPalette.slate900,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.star_rounded,
+                                    color: Color(0xFFF59E0B),
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    rating,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                      color: AppPalette.slate700,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Icon(
+                                    Icons.access_time_rounded,
+                                    color: AppPalette.slate700,
+                                    size: 13,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    eta,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                      color: AppPalette.slate700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Fare badge
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text(
+                              "Counter offer",
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppPalette.slate700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              "₹ $fare",
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                color: AppPalette.slate900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    SizedBox(
-                      width: 130,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                          padding: EdgeInsets.zero,
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        // Reject button
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12),
+                              foregroundColor: Colors.redAccent,
+                              side: const BorderSide(
+                                color: Colors.redAccent,
+                                width: 1,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: actionLoading
+                                ? null
+                                : () {
+                                    setState(() {
+                                      offers.removeWhere(
+                                        (o) =>
+                                            _normalizeOfferId(o["_id"]) ==
+                                            offerId,
+                                      );
+                                    });
+                                  },
+                            child: const Text("Reject"),
+                          ),
                         ),
-                        onPressed: actionLoading || offerId.isEmpty
-                            ? null
-                            : () => confirmOffer(offerId),
-                        child: const Text(
-                          "Accept Offer",
-                          textAlign: TextAlign.center,
+                        const SizedBox(width: 10),
+                        // Accept button
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12),
+                              backgroundColor: AppPalette.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            onPressed: actionLoading || offerId.isEmpty
+                                ? null
+                                : () => confirmOffer(offerId),
+                            child: const Text(
+                              "Accept Offer",
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
@@ -1497,6 +2047,18 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
+                      // Driver assigned card (user view only, when accepted)
+                      if (status == "accepted" &&
+                          !widget.isDriver &&
+                          driverMap != null) ...[
+                        _buildDriverAssignedCard(
+                          driverMap: Map<String, dynamic>.from(driverMap),
+                          otp: ride?["otp"]?.toString() ?? "",
+                          fare: fare,
+                          pickupAddress: pickupAddress,
+                          dropAddress: dropAddress,
+                        ),
+                      ],
                       if (isNegotiationWaiting) ...[
                         _buildOffersSection(),
                         const SizedBox(height: 20),
@@ -1519,7 +2081,9 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                               ),
                             ),
                             const SizedBox(height: 16),
+                            // OTP shown in driver card when accepted; show here only for ongoing status
                             if (!widget.isDriver &&
+                                status != "accepted" &&
                                 ride?["otp"] != null &&
                                 ride?["otp"].toString().isNotEmpty == true) ...[
                               Container(
@@ -1660,51 +2224,54 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                   ],
                                 ),
                               ] else ...[
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFEFF6FF),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: const Color(0xFF93C5FD),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.info_outline_rounded,
-                                        color: AppPalette.primary,
+                                // Driver info already shown in the card above — just show cancel
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF4ADE80),
+                                        shape: BoxShape.circle,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          "Waiting for driver to reach you and start the ride.",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: AppPalette.primary,
-                                          ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        "Driver is on the way to your pickup",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                          color: Colors.white.withOpacity(0.75),
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 14),
                                 SizedBox(
                                   width: double.infinity,
-                                  child: OutlinedButton(
+                                  child: OutlinedButton.icon(
                                     style: OutlinedButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(
-                                        vertical: 12,
+                                        vertical: 13,
                                       ),
                                       foregroundColor: Colors.redAccent,
                                       side: const BorderSide(
                                         color: Colors.redAccent,
                                       ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
                                     ),
                                     onPressed: actionLoading
                                         ? null
                                         : cancelRide,
-                                    child: const Text("Cancel Ride"),
+                                    icon: const Icon(Icons.cancel_outlined, size: 18),
+                                    label: const Text(
+                                      "Cancel Ride",
+                                      style: TextStyle(fontWeight: FontWeight.w700),
+                                    ),
                                   ),
                                 ),
                               ],
