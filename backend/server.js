@@ -31,6 +31,16 @@ mongoose.connect(process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/biketaxi"
     console.log(err);
 });
 
+/* ---------------- HEALTH CHECK ---------------- */
+
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    db: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    uptime: process.uptime()
+  });
+});
+
 /* ---------------- ROUTES ---------------- */
 
 app.use("/api/users",userRoutes);
