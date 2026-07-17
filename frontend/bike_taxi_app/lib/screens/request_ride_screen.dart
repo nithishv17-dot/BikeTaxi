@@ -860,7 +860,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     );
   }
 
-  Widget _buildDraggableSheet(BuildContext context) {
+ Widget _buildDraggableSheet(BuildContext context) {
     return DraggableScrollableSheet(
       controller: _sheetCtrl,
       initialChildSize: 0.30,
@@ -873,11 +873,18 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
-            decoration: BoxDecoration(color: const Color(0xFF141616).withOpacity(0.92), borderRadius: const BorderRadius.vertical(top: Radius.circular(28)), border: Border.all(color: Colors.white.withOpacity(0.10))),
-            child: SingleChildScrollView(
+            decoration: BoxDecoration(
+              color: const Color(0xFF141616).withOpacity(0.92), 
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)), 
+              border: Border.all(color: Colors.white.withOpacity(0.10)),
+            ),
+            // Replaced SingleChildScrollView with ListView to pass the correct physics/scrollController
+            child: ListView(
               controller: scrollController,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: _buildSheetContent(),
+              children: [
+                _buildSheetContent(),
+              ],
             ),
           ),
         ),
