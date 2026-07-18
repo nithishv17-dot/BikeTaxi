@@ -36,6 +36,14 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   Timer? countdownTimer;
   int negotiationSecondsRemaining = 0;
   String? overridePaymentMethod;
+  bool _isDetailsExpanded = false;
+
+  String _formatFareToInt(dynamic rawFare) {
+    if (rawFare == null) return "N/A";
+    final parsed = double.tryParse(rawFare.toString());
+    if (parsed == null) return rawFare.toString();
+    return parsed.round().toString();
+  }
 
   bool get isNegotiationRide =>
       ride?["bookingMode"]?.toString() == "negotiation";
@@ -1465,10 +1473,9 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   }
 
   Widget _buildOffersSection() {
-    final currentFare =
-        (ride?["offeredFare"] ?? ride?["estimatedFare"] ?? ride?["finalFare"])
-            ?.toString() ??
-        "N/A";
+    final currentFare = _formatFareToInt(
+        ride?["offeredFare"] ?? ride?["estimatedFare"] ?? ride?["finalFare"]
+    );
 
     return ReflectionCard(
       padding: const EdgeInsets.all(20),
@@ -1562,7 +1569,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
               final offerId = _normalizeOfferId(offer["_id"]) ?? "";
               final driverName =
                   offer["driverName"]?.toString() ?? "Captain";
-              final fare = offer["offeredFare"]?.toString() ?? "0";
+              final fare = _formatFareToInt(offer["offeredFare"]);
               final rating =
                   (offer["driverRating"] ?? offer["rating"])?.toString() ??
                       "4.8";
@@ -1877,14 +1884,13 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       fallback: "Drop address",
     );
     final dynamic negotiatedFare = ride?["offeredFare"] ?? ride?["finalFare"];
-    final fare =
-        (negotiatedFare != null && negotiatedFare != 0
-                ? negotiatedFare
-                : ride?["estimatedFare"])
-            ?.toString() ??
-        "N/A";
-    final initialFare = ride?["initialFare"]?.toString() ?? "N/A";
-    final offeredFare = ride?["offeredFare"]?.toString() ?? "N/A";
+    final fare = _formatFareToInt(
+        negotiatedFare != null && negotiatedFare != 0
+            ? negotiatedFare
+            : ride?["estimatedFare"]
+    );
+    final initialFare = _formatFareToInt(ride?["initialFare"]);
+    final offeredFare = _formatFareToInt(ride?["offeredFare"]);
     final negotiationStatus = ride?["negotiationStatus"]?.toString() ?? "N/A";
     final dbPaymentMethod = ride?["paymentMethod"]?.toString() ?? "N/A";
     final paymentMethod = overridePaymentMethod ?? dbPaymentMethod;
@@ -2072,88 +2078,108 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              "Ride Details",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: AppPalette.slate900,
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _isDetailsExpanded = !_isDetailsExpanded;
+                                });
+                              },
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    "Ride Details",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppPalette.slate900,
+                                    ),
+                                  ),
+                                  Icon(
+                                    _isDetailsExpanded
+                                        ? Icons.keyboard_arrow_up_rounded
+                                        : Icons.keyboard_arrow_down_rounded,
+                                    color: AppPalette.slate900,
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 16),
-                            // OTP shown in driver card when accepted; show here only for ongoing status
-                            if (!widget.isDriver &&
-                                status != "accepted" &&
-                                ride?["otp"] != null &&
-                                ride?["otp"].toString().isNotEmpty == true) ...[
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                  horizontal: 16,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppPalette.accent.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: AppPalette.accent.withOpacity(0.3),
+                            if (_isDetailsExpanded) ...[
+                              const SizedBox(height: 16),
+                              // OTP shown in driver card when accepted; show here only for ongoing status
+                              if (!widget.isDriver &&
+                                  status != "accepted" &&
+                                  ride?["otp"] != null &&
+                                  ride?["otp"].toString().isNotEmpty == true) ...[
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 16,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppPalette.accent.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: AppPalette.accent.withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            "SHARE OTP WITH DRIVER",
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppPalette.primary,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                          SizedBox(height: 2),
+                                          Text(
+                                            "Give this OTP to start the ride",
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: AppPalette.slate700,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        "${ride?["otp"]}",
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppPalette.primary,
+                                          letterSpacing: 2,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          "SHARE OTP WITH DRIVER",
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w800,
-                                            color: AppPalette.primary,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                        SizedBox(height: 2),
-                                        Text(
-                                          "Give this OTP to start the ride",
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: AppPalette.slate700,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    Text(
-                                      "${ride?["otp"]}",
-                                      style: const TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w900,
-                                        color: AppPalette.primary,
-                                        letterSpacing: 2,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                const SizedBox(height: 16),
+                              ],
+                              _buildInfoRow("Booking Mode", bookingMode),
+                              _buildInfoRow("Fare", "Rs. $fare"),
+                              _buildInfoRow("Offered Fare", offeredFare),
+                              _buildInfoRow("Negotiation", negotiationStatus),
+                              _buildInfoRow("Payment Method", paymentMethod),
+                              _buildInfoRow(
+                                "Driver",
+                                "${driverMap?["name"] ?? "N/A"}",
                               ),
-                              const SizedBox(height: 16),
+                              _buildInfoRow(
+                                "Phone",
+                                "${driverMap?["phone"] ?? "N/A"}",
+                              ),
                             ],
-                            _buildInfoRow("Booking Mode", bookingMode),
-                            _buildInfoRow("Fare", "Rs. $fare"),
-                            _buildInfoRow("Offered Fare", offeredFare),
-                            _buildInfoRow("Negotiation", negotiationStatus),
-                            _buildInfoRow("Payment Method", paymentMethod),
-                            _buildInfoRow(
-                              "Driver",
-                              "${driverMap?["name"] ?? "N/A"}",
-                            ),
-                            _buildInfoRow(
-                              "Phone",
-                              "${driverMap?["phone"] ?? "N/A"}",
-                            ),
                           ],
                         ),
                       ),
@@ -2488,15 +2514,10 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                 ],
                               ],
                             ],
-                            const SizedBox(height: 10),
-                            OutlinedButton(
-                              onPressed: fetchRide,
-                              child: const Text("Refresh Status"),
-                            ),
                           ],
                         ),
                       ),
-                      if (message.isNotEmpty) ...[
+                      if (message.isNotEmpty && message != "Ride fetched successfully") ...[
                         const SizedBox(height: 16),
                         ReflectionCard(
                           padding: const EdgeInsets.all(16),

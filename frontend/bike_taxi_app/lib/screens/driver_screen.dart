@@ -313,7 +313,8 @@ class _DriverScreenState extends State<DriverScreen> {
                   ride["destination"]?.toString(),
               fallback: "Drop address",
             );
-            final fare = ride["estimatedFare"] ?? 0;
+            final rawFare = ride["estimatedFare"];
+            final fare = rawFare is num ? rawFare.round() : (double.tryParse(rawFare?.toString() ?? "")?.round() ?? 0);
             final otpController = _otpControllerForRide(rideId);
 
             return Padding(

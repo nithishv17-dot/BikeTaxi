@@ -91,8 +91,14 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
       fallback: "Drop address",
     );
     final status = ride["status"]?.toString() ?? "";
-    final initialFare = ride["initialFare"]?.toString() ?? "N/A";
-    final offeredFare = ride["offeredFare"]?.toString() ?? "N/A";
+    String formatFareToInt(dynamic rawFare) {
+      if (rawFare == null) return "N/A";
+      final parsed = double.tryParse(rawFare.toString());
+      if (parsed == null) return rawFare.toString();
+      return parsed.round().toString();
+    }
+    final initialFare = formatFareToInt(ride["initialFare"]);
+    final offeredFare = formatFareToInt(ride["offeredFare"]);
     final negotiationStatus = ride["negotiationStatus"]?.toString() ?? "N/A";
     final paymentMethod = ride["paymentMethod"]?.toString() ?? "N/A";
     final paymentStatus = ride["paymentStatus"]?.toString() ?? "N/A";

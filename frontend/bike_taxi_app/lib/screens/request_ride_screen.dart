@@ -104,8 +104,8 @@ class CollapsibleRideDetails extends StatelessWidget {
                   
                   // Key-Value Details
                   _buildDetailRow("Booking Mode", bookingMode),
-                  _buildDetailRow("Fare", "Rs. ${fare.toStringAsFixed(2)}"),
-                  _buildDetailRow("Offered Fare", offeredFare.toStringAsFixed(2)),
+                  _buildDetailRow("Fare", "Rs. ${fare.round()}"),
+                  _buildDetailRow("Offered Fare", offeredFare.round().toString()),
                   _buildDetailRow("Negotiation", negotiation),
                   _buildDetailRow("Payment Method", paymentMethod),
                   _buildDetailRow("Driver", driverName),

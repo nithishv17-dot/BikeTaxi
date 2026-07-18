@@ -189,6 +189,12 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
     final rideId = ride["_id"]?.toString() ?? "";
     final controller = _controllerForRide(rideId);
 
+    int formatFareToInt(dynamic rawFare) {
+      if (rawFare == null) return 0;
+      if (rawFare is num) return rawFare.round();
+      return double.tryParse(rawFare.toString())?.round() ?? 0;
+    }
+
     final offers = (ride["offers"] as List<dynamic>? ?? const [])
         .whereType<Map>()
         .map((offer) => Map<String, dynamic>.from(offer))
@@ -303,7 +309,7 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
           ),
           const SizedBox(height: 14),
           Text(
-            "Estimated Fare: Rs. ${ride["estimatedFare"] ?? 0}",
+            "Estimated Fare: Rs. ${formatFareToInt(ride["estimatedFare"])}",
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w800,
@@ -330,8 +336,8 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
                   Expanded(
                     child: Text(
                       existingOffer["status"] == "accepted_base"
-                          ? "You accepted the base fare (Rs. ${ride["estimatedFare"]}). Waiting for rider response."
-                          : "You countered with Rs. ${existingOffer["offeredFare"]}. Waiting for rider response.",
+                          ? "You accepted the base fare (Rs. ${formatFareToInt(ride["estimatedFare"])}). Waiting for rider response."
+                          : "You countered with Rs. ${formatFareToInt(existingOffer["offeredFare"])}. Waiting for rider response.",
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1E40AF),
