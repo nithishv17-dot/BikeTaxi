@@ -189,10 +189,14 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
     final rideId = ride["_id"]?.toString() ?? "";
     final controller = _controllerForRide(rideId);
 
-    int formatFareToInt(dynamic rawFare) {
-      if (rawFare == null) return 0;
-      if (rawFare is num) return rawFare.round();
-      return double.tryParse(rawFare.toString())?.round() ?? 0;
+    String formatFareToInt(dynamic rawFare) {
+      if (rawFare == null) return "0.00";
+      final parsed = double.tryParse(rawFare.toString());
+      if (parsed == null) {
+        if (rawFare.toString() == "N/A") return "N/A";
+        return rawFare.toString();
+      }
+      return parsed.round().toStringAsFixed(2);
     }
 
     final offers = (ride["offers"] as List<dynamic>? ?? const [])

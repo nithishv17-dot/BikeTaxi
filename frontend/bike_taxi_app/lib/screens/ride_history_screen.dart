@@ -94,8 +94,11 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
     String formatFareToInt(dynamic rawFare) {
       if (rawFare == null) return "N/A";
       final parsed = double.tryParse(rawFare.toString());
-      if (parsed == null) return rawFare.toString();
-      return parsed.round().toString();
+      if (parsed == null) {
+        if (rawFare.toString() == "N/A") return "N/A";
+        return rawFare.toString();
+      }
+      return parsed.round().toStringAsFixed(2);
     }
     final initialFare = formatFareToInt(ride["initialFare"]);
     final offeredFare = formatFareToInt(ride["offeredFare"]);

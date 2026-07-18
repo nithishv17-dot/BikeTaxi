@@ -41,8 +41,11 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   String _formatFareToInt(dynamic rawFare) {
     if (rawFare == null) return "N/A";
     final parsed = double.tryParse(rawFare.toString());
-    if (parsed == null) return rawFare.toString();
-    return parsed.round().toString();
+    if (parsed == null) {
+      if (rawFare.toString() == "N/A") return "N/A";
+      return rawFare.toString();
+    }
+    return parsed.round().toStringAsFixed(2);
   }
 
   bool get isNegotiationRide =>
@@ -2074,98 +2077,84 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                         const SizedBox(height: 20),
                       ],
                       ReflectionCard(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _isDetailsExpanded = !_isDetailsExpanded;
-                                });
-                              },
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    "Ride Details",
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppPalette.slate900,
-                                    ),
-                                  ),
-                                  Icon(
-                                    _isDetailsExpanded
-                                        ? Icons.keyboard_arrow_up_rounded
-                                        : Icons.keyboard_arrow_down_rounded,
-                                    color: AppPalette.slate900,
-                                  ),
-                                ],
+                        padding: EdgeInsets.zero,
+                        child: Theme(
+                          data: Theme.of(context).copyWith(
+                            dividerColor: Colors.transparent,
+                          ),
+                          child: ExpansionTile(
+                            initiallyExpanded: false,
+                            title: const Text(
+                              "Ride Details",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: AppPalette.slate900,
                               ),
                             ),
-                            if (_isDetailsExpanded) ...[
-                              const SizedBox(height: 16),
-                              // OTP shown in driver card when accepted; show here only for ongoing status
-                              if (!widget.isDriver &&
-                                  status != "accepted" &&
-                                  ride?["otp"] != null &&
-                                  ride?["otp"].toString().isNotEmpty == true) ...[
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                    horizontal: 16,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppPalette.accent.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: AppPalette.accent.withOpacity(0.3),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                            subtitle: (!widget.isDriver &&
+                                    driverMap != null &&
+                                    ride?["otp"] != null &&
+                                    ride?["otp"].toString().isNotEmpty == true)
+                                ? Padding(
+                                    padding: const EdgeInsets.only(top: 8, bottom: 8),
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                        horizontal: 16,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppPalette.accent.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: AppPalette.accent.withOpacity(0.3),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Text(
-                                            "SHARE OTP WITH DRIVER",
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w800,
-                                              color: AppPalette.primary,
-                                              letterSpacing: 0.5,
-                                            ),
+                                          const Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                "SHARE OTP WITH DRIVER",
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: AppPalette.primary,
+                                                  letterSpacing: 0.5,
+                                                ),
+                                              ),
+                                              SizedBox(height: 2),
+                                              Text(
+                                                "Give this OTP to start the ride",
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: AppPalette.slate700,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                          SizedBox(height: 2),
                                           Text(
-                                            "Give this OTP to start the ride",
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: AppPalette.slate700,
-                                              fontWeight: FontWeight.w500,
+                                            "${ride?["otp"]}",
+                                            style: const TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.w900,
+                                              color: AppPalette.primary,
+                                              letterSpacing: 2,
                                             ),
                                           ),
                                         ],
                                       ),
-                                      Text(
-                                        "${ride?["otp"]}",
-                                        style: const TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.w900,
-                                          color: AppPalette.primary,
-                                          letterSpacing: 2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                              ],
+                                    ),
+                                  )
+                                : null,
+                            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            children: [
                               _buildInfoRow("Booking Mode", bookingMode),
                               _buildInfoRow("Fare", "Rs. $fare"),
                               _buildInfoRow("Offered Fare", offeredFare),
@@ -2180,343 +2169,326 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                 "${driverMap?["phone"] ?? "N/A"}",
                               ),
                             ],
-                          ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 20),
-                      ReflectionCard(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Actions",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: AppPalette.slate900,
+                      if (status == "accepted") ...[
+                        if (widget.isDriver) ...[
+                          TextField(
+                            controller: otpController,
+                            keyboardType: TextInputType.number,
+                            maxLength: 4,
+                            decoration: const InputDecoration(
+                              labelText: "Enter Rider's 4-Digit OTP",
+                              hintText: "4-Digit OTP code",
+                              counterText: "",
+                              prefixIcon: Icon(Icons.lock_open_rounded),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  onPressed: actionLoading
+                                      ? null
+                                      : startRide,
+                                  child: const Text("Verify & Start"),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 2,
+                                child: OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    foregroundColor: Colors.redAccent,
+                                    side: const BorderSide(
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                  onPressed: actionLoading
+                                      ? null
+                                      : cancelRide,
+                                  child: const Text("Cancel"),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ] else ...[
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF4ADE80),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  "Driver is on the way to your pickup",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                    color: Colors.white.withOpacity(0.75),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 13,
+                                ),
+                                foregroundColor: Colors.redAccent,
+                                side: const BorderSide(
+                                  color: Colors.redAccent,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              onPressed: actionLoading
+                                  ? null
+                                  : cancelRide,
+                              icon: const Icon(Icons.cancel_outlined, size: 18),
+                              label: const Text(
+                                "Cancel Ride",
+                                style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                             ),
-                            const SizedBox(height: 16),
-                            if (status == "accepted") ...[
-                              if (widget.isDriver) ...[
-                                TextField(
-                                  controller: otpController,
-                                  keyboardType: TextInputType.number,
-                                  maxLength: 4,
-                                  decoration: const InputDecoration(
-                                    labelText: "Enter Rider's 4-Digit OTP",
-                                    hintText: "4-Digit OTP code",
-                                    counterText: "",
-                                    prefixIcon: Icon(Icons.lock_open_rounded),
+                          ),
+                        ],
+                        const SizedBox(height: 20),
+                      ],
+                      if (status == "ongoing") ...[
+                        Row(
+                          children: [
+                            if (widget.isDriver) ...[
+                              Expanded(
+                                flex: 3,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    backgroundColor: AppPalette.secondary,
                                   ),
+                                  onPressed: actionLoading
+                                      ? null
+                                      : completeRide,
+                                  child: const Text("Complete Ride"),
                                 ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      flex: 3,
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                          ),
-                                        ),
-                                        onPressed: actionLoading
-                                            ? null
-                                            : startRide,
-                                        child: const Text("Verify & Start"),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      flex: 2,
-                                      child: OutlinedButton(
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                          ),
-                                          foregroundColor: Colors.redAccent,
-                                          side: const BorderSide(
-                                            color: Colors.redAccent,
-                                          ),
-                                        ),
-                                        onPressed: actionLoading
-                                            ? null
-                                            : cancelRide,
-                                        child: const Text("Cancel"),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ] else ...[
-                                // Driver info already shown in the card above — just show cancel
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF4ADE80),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        "Driver is on the way to your pickup",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                          color: Colors.white.withOpacity(0.75),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 13,
-                                      ),
-                                      foregroundColor: Colors.redAccent,
-                                      side: const BorderSide(
-                                        color: Colors.redAccent,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                    ),
-                                    onPressed: actionLoading
-                                        ? null
-                                        : cancelRide,
-                                    icon: const Icon(Icons.cancel_outlined, size: 18),
-                                    label: const Text(
-                                      "Cancel Ride",
-                                      style: TextStyle(fontWeight: FontWeight.w700),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 10),
-                            ],
-                            if (status == "ongoing") ...[
-                              Row(
-                                children: [
-                                  if (widget.isDriver) ...[
-                                    Expanded(
-                                      flex: 3,
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                          ),
-                                          backgroundColor: AppPalette.secondary,
-                                        ),
-                                        onPressed: actionLoading
-                                            ? null
-                                            : completeRide,
-                                        child: const Text("Complete Ride"),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      flex: 2,
-                                      child: OutlinedButton(
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                          ),
-                                          foregroundColor: Colors.redAccent,
-                                          side: const BorderSide(
-                                            color: Colors.redAccent,
-                                          ),
-                                        ),
-                                        onPressed: actionLoading
-                                            ? null
-                                            : cancelRide,
-                                        child: const Text("Cancel"),
-                                      ),
-                                    ),
-                                  ] else ...[
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                          ),
-                                          foregroundColor: Colors.redAccent,
-                                          side: const BorderSide(
-                                            color: Colors.redAccent,
-                                          ),
-                                        ),
-                                        onPressed: actionLoading
-                                            ? null
-                                            : cancelRide,
-                                        child: const Text("Cancel Ride"),
-                                      ),
-                                    ),
-                                  ],
-                                ],
                               ),
-                              const SizedBox(height: 10),
-                            ],
-                            if (status == "completed" &&
-                                paymentStatus == "Pending") ...[
-                              const SizedBox(height: 10),
-                              if (widget.isDriver) ...[
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppPalette.secondary,
-                                        ),
-                                        onPressed: () =>
-                                            _showUPIQRCodeDialog(context, fare),
-                                        child: const Text("Generate QR Code"),
-                                      ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 2,
+                                child: OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        onPressed: actionLoading
-                                            ? null
-                                            : payRide,
-                                        child: const Text("Cash Paid"),
-                                      ),
+                                    foregroundColor: Colors.redAccent,
+                                    side: const BorderSide(
+                                      color: Colors.redAccent,
                                     ),
-                                  ],
+                                  ),
+                                  onPressed: actionLoading
+                                      ? null
+                                      : cancelRide,
+                                  child: const Text("Cancel"),
                                 ),
-                              ] else ...[
-                                if (paymentMethod == "Cash") ...[
-                                  Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFEFF6FF),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: const Color(0xFF93C5FD),
-                                      ),
+                              ),
+                            ] else ...[
+                              Expanded(
+                                child: OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
                                     ),
-                                    child: Row(
+                                    foregroundColor: Colors.redAccent,
+                                    side: const BorderSide(
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                  onPressed: actionLoading
+                                      ? null
+                                      : cancelRide,
+                                  child: const Text("Cancel Ride"),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                      if (status == "completed" &&
+                          paymentStatus == "Pending") ...[
+                        const SizedBox(height: 10),
+                        if (widget.isDriver) ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppPalette.secondary,
+                                  ),
+                                  onPressed: () =>
+                                      _showUPIQRCodeDialog(context, fare),
+                                  child: const Text("Generate QR Code"),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: actionLoading
+                                      ? null
+                                      : payRide,
+                                  child: const Text("Cash Paid"),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ] else ...[
+                          if (paymentMethod == "Cash") ...[
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFF93C5FD),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.payments_rounded,
+                                    color: AppPalette.primary,
+                                    size: 28,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        const Icon(
-                                          Icons.payments_rounded,
-                                          color: AppPalette.primary,
-                                          size: 28,
+                                        Text(
+                                          "Please pay Captain Rs. $fare in Cash",
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                            color: AppPalette.slate900,
+                                          ),
                                         ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                "Please pay Captain Rs. $fare in Cash",
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 15,
-                                                  color: AppPalette.slate900,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              const Text(
-                                                "Waiting for Captain to confirm cash receipt...",
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: AppPalette.slate600,
-                                                ),
-                                              ),
-                                            ],
+                                        const SizedBox(height: 4),
+                                        const Text(
+                                          "Waiting for Captain to confirm cash receipt...",
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: AppPalette.slate600,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                ] else if (paymentMethod == "UPI") ...[
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppPalette.primary,
-                                    ),
-                                    onPressed: () =>
-                                        _showRiderUPISelector(context, fare),
-                                    child: const Text("Pay Now (UPI)"),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                      minimumSize: const Size(
-                                        double.infinity,
-                                        54,
-                                      ),
-                                      side: const BorderSide(
-                                        color: AppPalette.primary,
-                                      ),
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        overridePaymentMethod = "Cash";
-                                      });
-                                    },
-                                    child: const Text("Pay via Cash"),
-                                  ),
-                                ] else if (paymentMethod == "Card") ...[
-                                  ElevatedButton(
-                                    onPressed: () =>
-                                        _processRiderCardPayment(context),
-                                    child: const Text("Pay Now (Card)"),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                      minimumSize: const Size(
-                                        double.infinity,
-                                        54,
-                                      ),
-                                      side: const BorderSide(
-                                        color: AppPalette.primary,
-                                      ),
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        overridePaymentMethod = "Cash";
-                                      });
-                                    },
-                                    child: const Text("Pay via Cash"),
-                                  ),
-                                ] else ...[
-                                  ElevatedButton(
-                                    onPressed: actionLoading ? null : payRide,
-                                    child: const Text("Pay Now"),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                      minimumSize: const Size(
-                                        double.infinity,
-                                        54,
-                                      ),
-                                      side: const BorderSide(
-                                        color: AppPalette.primary,
-                                      ),
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        overridePaymentMethod = "Cash";
-                                      });
-                                    },
-                                    child: const Text("Pay via Cash"),
-                                  ),
                                 ],
-                              ],
-                            ],
+                              ),
+                            ),
+                          ] else if (paymentMethod == "UPI") ...[
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppPalette.primary,
+                              ),
+                              onPressed: () =>
+                                  _showRiderUPISelector(context, fare),
+                              child: const Text("Pay Now (UPI)"),
+                            ),
+                            const SizedBox(height: 10),
+                            OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(
+                                  double.infinity,
+                                  54,
+                                ),
+                                side: const BorderSide(
+                                  color: AppPalette.primary,
+                                ),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  overridePaymentMethod = "Cash";
+                                });
+                              },
+                              child: const Text("Pay via Cash"),
+                            ),
+                          ] else if (paymentMethod == "Card") ...[
+                            ElevatedButton(
+                              onPressed: () =>
+                                  _processRiderCardPayment(context),
+                              child: const Text("Pay Now (Card)"),
+                            ),
+                            const SizedBox(height: 10),
+                            OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(
+                                  double.infinity,
+                                  54,
+                                ),
+                                side: const BorderSide(
+                                  color: AppPalette.primary,
+                                ),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  overridePaymentMethod = "Cash";
+                                });
+                              },
+                              child: const Text("Pay via Cash"),
+                            ),
+                          ] else ...[
+                            ElevatedButton(
+                              onPressed: actionLoading ? null : payRide,
+                              child: const Text("Pay Now"),
+                            ),
+                            const SizedBox(height: 10),
+                            OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(
+                                  double.infinity,
+                                  54,
+                                ),
+                                side: const BorderSide(
+                                  color: AppPalette.primary,
+                                ),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  overridePaymentMethod = "Cash";
+                                });
+                              },
+                              child: const Text("Pay via Cash"),
+                            ),
                           ],
-                        ),
-                      ),
+                        ],
+                        const SizedBox(height: 20),
+                      ],
                       if (message.isNotEmpty && message != "Ride fetched successfully") ...[
                         const SizedBox(height: 16),
                         ReflectionCard(
