@@ -2232,20 +2232,21 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                            status == "negotiation_expired")) ...[
                         SizedBox(
                           width: double.infinity,
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 13),
-                              foregroundColor: Colors.redAccent,
-                              side: const BorderSide(color: Colors.redAccent),
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              backgroundColor: Colors.red.shade900,
+                              foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                               ),
+                              elevation: 2,
                             ),
                             onPressed: actionLoading ? null : cancelRide,
-                            icon: const Icon(Icons.cancel_outlined, size: 18),
+                            icon: const Icon(Icons.cancel_outlined, size: 18, color: Colors.white),
                             label: const Text(
                               "Cancel Ride Request",
-                              style: TextStyle(fontWeight: FontWeight.w700),
+                              style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
                             ),
                           ),
                         ),

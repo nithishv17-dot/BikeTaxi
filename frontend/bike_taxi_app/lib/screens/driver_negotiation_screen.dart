@@ -541,14 +541,6 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Negotiation Board"),
-        actions: [
-          IconButton(
-            tooltip: "Refresh List",
-            onPressed: fetchNegotiationRides,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-          const SizedBox(width: 4),
-        ],
       ),
       body: PremiumBackdrop(
         child: SafeArea(

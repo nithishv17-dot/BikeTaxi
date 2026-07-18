@@ -63,6 +63,7 @@ class BikeTaxiApp extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           elevation: 0,
+          scrolledUnderElevation: 0,
           backgroundColor: Colors.transparent,
           foregroundColor: AppPalette.slate900,
           titleTextStyle: TextStyle(

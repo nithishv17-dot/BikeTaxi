@@ -125,14 +125,6 @@ class _DriverListScreenState extends State<DriverListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Drivers"),
-        actions: [
-          IconButton(
-            tooltip: "Refresh",
-            onPressed: fetchDrivers,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-          const SizedBox(width: 4),
-        ],
       ),
       body: PremiumBackdrop(
         accentColor: AppPalette.primary,

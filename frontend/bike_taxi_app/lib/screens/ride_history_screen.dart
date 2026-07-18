@@ -214,14 +214,6 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Ride History"),
-        actions: [
-          IconButton(
-            tooltip: "Refresh",
-            onPressed: fetchRideHistory,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-          const SizedBox(width: 4),
-        ],
       ),
       body: PremiumBackdrop(
         accentColor: AppPalette.primary,

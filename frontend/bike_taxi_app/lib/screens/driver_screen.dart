@@ -23,6 +23,7 @@ class DriverScreen extends StatefulWidget {
 class _DriverScreenState extends State<DriverScreen> {
   final TextEditingController rideIdController = TextEditingController();
   final Map<String, TextEditingController> otpControllers = {};
+  final Map<String, TextEditingController> offerControllers = {};
 
   int _currentIndex = 0;
   String driverName = "";
@@ -30,8 +31,10 @@ class _DriverScreenState extends State<DriverScreen> {
 
   bool isAvailable = false;
   bool isLoading = true;
+  bool isSubmitting = false;
   String message = "";
   List<Map<String, dynamic>> directRequests = [];
+  List<Map<String, dynamic>> negotiationRides = [];
   Timer? _locationTimer;
 
   void _startLocationUpdates() {
@@ -67,6 +70,127 @@ class _DriverScreenState extends State<DriverScreen> {
     return otpControllers.putIfAbsent(rideId, TextEditingController.new);
   }
 
+  TextEditingController _offerControllerForRide(String rideId) {
+    return offerControllers.putIfAbsent(rideId, TextEditingController.new);
+  }
+
+  Future<void> submitOffer(String rideId, {bool acceptBaseFare = false}) async {
+    final controller = _offerControllerForRide(rideId);
+    final offeredFare = double.tryParse(controller.text.trim());
+
+    if (!acceptBaseFare && offeredFare == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enter a valid offer amount")),
+      );
+      return;
+    }
+
+    setState(() {
+      isSubmitting = true;
+    });
+
+    try {
+      final response = await ApiService.submitRideOffer(
+        rideId,
+        widget.driverId,
+        offeredFare: offeredFare,
+        acceptBaseFare: acceptBaseFare,
+      );
+
+      if (!mounted) return;
+
+      final responseMessage =
+          response["message"]?.toString() ??
+          (acceptBaseFare
+              ? "Base fare accepted successfully"
+              : "Offer submitted successfully");
+
+      setState(() {
+        controller.clear();
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(responseMessage)));
+
+      await _loadDriverStatus();
+    } catch (e) {
+      if (!mounted) return;
+      final errorMessage = e.toString().replaceFirst("Exception: ", "");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorMessage)));
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> declineRide(String rideId) async {
+    setState(() {
+      isSubmitting = true;
+    });
+
+    try {
+      await ApiService.rejectFare(rideId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Trip declined successfully")),
+      );
+      await _loadDriverStatus();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Decline failed: ${e.toString()}")),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  void _handleDriverAssignedSocket(dynamic data) {
+    if (data == null || !mounted) return;
+    final rideId = _normalizeId(data["_id"]);
+    final assignedDriverId = _normalizeId(data["driverId"]);
+
+    if (assignedDriverId == widget.driverId && rideId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Ride matched! Opening status page...")),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              RideStatusScreen(rideId: rideId, isDriver: true),
+        ),
+      );
+    } else {
+      _loadDriverStatus();
+    }
+  }
+
+  String? _normalizeId(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is String) {
+      return value;
+    }
+    if (value is Map) {
+      return value["\$oid"]?.toString() ??
+          value["id"]?.toString() ??
+          value["_id"]?.toString();
+    }
+    return value.toString();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +206,8 @@ class _DriverScreenState extends State<DriverScreen> {
     SocketService.listenRideCompleted((_) => _loadDriverStatus());
     SocketService.listenRideCancelled((_) => _loadDriverStatus());
     SocketService.listenNegotiationClosed((_) => _loadDriverStatus());
+    SocketService.listenNegotiationRideRequested((_) => _loadDriverStatus());
+    SocketService.listenNegotiationOfferAcceptedByUser((data) => _handleDriverAssignedSocket(data));
   }
 
   Future<void> _loadDriverStatus() async {
@@ -103,6 +229,14 @@ class _DriverScreenState extends State<DriverScreen> {
             .whereType<Map>(),
       );
 
+      final negotiationResponse = await ApiService.getDriverNegotiationRides(
+        widget.driverId,
+      );
+      final fetchedNegotiations = List<Map<String, dynamic>>.from(
+        (negotiationResponse["rides"] as List<dynamic>? ?? const [])
+            .whereType<Map>(),
+      );
+
       if (!mounted) return;
 
       setState(() {
@@ -110,6 +244,7 @@ class _DriverScreenState extends State<DriverScreen> {
         driverName = driver["name"] ?? driverName;
         driverPhone = driver["phone"] ?? driverPhone;
         directRequests = fetchedRequests;
+        negotiationRides = fetchedNegotiations;
         isLoading = false;
         message = "Driver status loaded";
       });
@@ -130,6 +265,9 @@ class _DriverScreenState extends State<DriverScreen> {
     SocketService.removeAllRideListeners();
     rideIdController.dispose();
     for (final controller in otpControllers.values) {
+      controller.dispose();
+    }
+    for (final controller in offerControllers.values) {
       controller.dispose();
     }
     super.dispose();
@@ -439,6 +577,405 @@ class _DriverScreenState extends State<DriverScreen> {
     );
   }
 
+  Widget _buildNegotiationBoardSection() {
+    if (!isAvailable) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              "Negotiation Board",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppPalette.slate900,
+              ),
+            ),
+            if (negotiationRides.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16A34A),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  "${negotiationRides.length} ACTIVE",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        if (negotiationRides.isEmpty)
+          const ReflectionCard(
+            padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.handshake_rounded,
+                    color: AppPalette.slate300,
+                    size: 48,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    "No Negotiation Offers",
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppPalette.slate700,
+                      fontSize: 15,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    "You will see passenger counter-offers here when they request negotiations.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppPalette.slate500, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ...negotiationRides.map((ride) => Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: _buildRideCard(ride),
+              )),
+      ],
+    );
+  }
+
+  Widget _buildRideCard(Map<String, dynamic> ride) {
+    final rideId = ride["_id"]?.toString() ?? "";
+    final controller = _offerControllerForRide(rideId);
+
+    String formatFareToInt(dynamic rawFare) {
+      if (rawFare == null) return "0.00";
+      final parsed = double.tryParse(rawFare.toString());
+      if (parsed == null) {
+        if (rawFare.toString() == "N/A") return "N/A";
+        return rawFare.toString();
+      }
+      return parsed.round().toStringAsFixed(2);
+    }
+
+    final offers = (ride["offers"] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((offer) => Map<String, dynamic>.from(offer))
+        .toList();
+
+    final existingOffer = offers.firstWhere(
+      (offer) => offer["driverId"]?.toString() == widget.driverId,
+      orElse: () => <String, dynamic>{},
+    );
+
+    final hasPendingOffer =
+        existingOffer.isNotEmpty &&
+        (existingOffer["status"] == "pending" ||
+            existingOffer["status"] == "accepted_base");
+
+    if (controller.text.isEmpty) {
+      final initialVal = existingOffer.isNotEmpty
+          ? existingOffer["offeredFare"]
+          : ride["estimatedFare"];
+      if (initialVal != null) {
+        controller.text = initialVal.toString();
+      }
+    }
+
+    return ReflectionCard(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Negotiation Board",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: (hasPendingOffer ? AppPalette.sky500 : const Color(0xFF16A34A)).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  hasPendingOffer ? "PENDING" : "IN PROGRESS",
+                  style: TextStyle(
+                    color: hasPendingOffer ? AppPalette.sky500 : const Color(0xFF4ADE80),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Divider(color: Colors.white12, height: 1),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppPalette.primary.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.people_alt_rounded,
+                  color: AppPalette.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "New Counter-Offer",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "Passenger: ${ride["userId"]?["name"] ?? "Passenger"}",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withOpacity(0.55),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        "Rs. ",
+                        style: TextStyle(
+                          color: AppPalette.primary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(
+                        width: 90,
+                        child: TextField(
+                          controller: controller,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            color: AppPalette.primary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(vertical: 4),
+                            border: UnderlineInputBorder(
+                              borderSide: BorderSide(color: AppPalette.primary),
+                            ),
+                            focusedBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(color: AppPalette.primary, width: 2),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Baseline: Rs. ${formatFareToInt(ride["estimatedFare"])}",
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white.withOpacity(0.4),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              title: Text(
+                "View Route Details",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withOpacity(0.55),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 12),
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.circle_outlined,
+                      size: 12,
+                      color: AppPalette.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        readableLocationLabel(
+                          ride["pickupAddress"]?.toString() ??
+                              ride["pickup"]?.toString(),
+                          fallback: "Pickup address",
+                        ),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppPalette.slate900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(left: 5),
+                  child: SizedBox(
+                    height: 10,
+                    child: VerticalDivider(
+                      thickness: 1.5,
+                      width: 2,
+                      color: AppPalette.slate500,
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on_rounded,
+                      size: 12,
+                      color: Color(0xFFEF4444),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        readableLocationLabel(
+                          ride["dropAddress"]?.toString() ??
+                              ride["destination"]?.toString(),
+                          fallback: "Drop address",
+                        ),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppPalette.slate900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    backgroundColor: const Color(0xFF1E293B),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  onPressed: isSubmitting ? null : () => declineRide(rideId),
+                  child: const Text(
+                    "Decline",
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: controller,
+                  builder: (context, val, child) {
+                    final valString = val.text.trim();
+                    final valDouble = double.tryParse(valString);
+                    final baseline = double.tryParse(ride["estimatedFare"]?.toString() ?? "") ?? 0.0;
+
+                    String labelText = "Accept Offer";
+                    bool isCounter = false;
+
+                    if (hasPendingOffer) {
+                      labelText = "Update Counter";
+                      isCounter = true;
+                    } else if (valDouble != null && (valDouble - baseline).abs() > 0.01) {
+                      labelText = "Send Counter";
+                      isCounter = true;
+                    }
+
+                    return ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: const Color(0xFFFFB77D),
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: (rideId.isEmpty || isSubmitting)
+                          ? null
+                          : () {
+                              if (isCounter) {
+                                submitOffer(rideId);
+                              } else {
+                                submitOffer(rideId, acceptBaseFare: true);
+                              }
+                            },
+                      child: Text(
+                        isSubmitting ? "Sending..." : labelText,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDashboardTab() {
     return RefreshIndicator(
       onRefresh: _loadDriverStatus,
@@ -446,190 +983,112 @@ class _DriverScreenState extends State<DriverScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [
-          // Top Banner
+          // Top Banner with integrated Duty Status switch
           RevealMotion(
             delay: const Duration(milliseconds: 40),
             beginOffset: const Offset(0, -0.1),
             child: ReflectiveBanner(
               colors: const [AppPalette.primary, AppPalette.textPrimary],
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Driver Hub",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "Welcome back, Captain",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: isAvailable
-                              ? AppPalette.secondary
-                              : const Color(0xFFEF4444),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color:
-                                  (isAvailable
-                                          ? AppPalette.secondary
-                                          : const Color(0xFFEF4444))
-                                      .withOpacity(0.4),
-                              blurRadius: 8,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          isAvailable
-                              ? "You are Online & Accepting Rides"
-                              : "You are Offline",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Status Toggle Card
-          RevealMotion(
-            delay: const Duration(milliseconds: 160),
-            child: ReflectionCard(
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Duty Status",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: AppPalette.slate900,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              isAvailable
-                                  ? "Go offline to take a break"
-                                  : "Go online to receive rides",
-                              style: const TextStyle(
-                                color: AppPalette.slate500,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Switch(
-                        value: isAvailable,
-                        onChanged: isLoading ? null : (_) => toggleDriver(),
-                        activeTrackColor: AppPalette.secondary,
-                        activeColor: Colors.white,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Negotiation Board Action Card
-          RevealMotion(
-            delay: const Duration(milliseconds: 280),
-            child: ReflectionCard(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        DriverNegotiationScreen(driverId: widget.driverId),
-                  ),
-                );
-              },
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF7C3AED).withOpacity(0.14),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: const Icon(
-                      Icons.handshake_rounded,
-                      color: Color(0xFF7C3AED),
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          "Negotiation Board",
+                        const Text(
+                          "Driver Hub",
                           style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppPalette.slate900,
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          "Welcome back, Captain",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: isAvailable
+                                    ? AppPalette.secondary
+                                    : const Color(0xFFEF4444),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                isAvailable
+                                    ? "Online & Accepting Rides"
+                                    : "You are Offline",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.35),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          "Duty Status",
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          "Respond to passenger fare counter-offers.",
-                          style: TextStyle(
-                            color: AppPalette.slate500,
-                            fontWeight: FontWeight.w600,
-                            height: 1.35,
+                        Transform.scale(
+                          scale: 0.85,
+                          child: Switch(
+                            value: isAvailable,
+                            onChanged: isLoading ? null : (_) => toggleDriver(),
+                            activeTrackColor: AppPalette.secondary,
+                            activeColor: Colors.white,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 16,
-                    color: AppPalette.slate500,
-                  ),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 24),
+
+          // Inline Negotiation Board Section
+          _buildNegotiationBoardSection(),
+          const SizedBox(height: 24),
+
+          // Direct Incoming Requests Section
           _buildRequestsSection(),
 
           // Status Message Box (if present)
@@ -801,15 +1260,6 @@ class _DriverScreenState extends State<DriverScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_currentIndex == 0 ? "Captain Panel" : "My Profile"),
-        actions: [
-          if (_currentIndex == 0)
-            IconButton(
-              onPressed: _loadDriverStatus,
-              tooltip: "Refresh Status",
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-          const SizedBox(width: 4),
-        ],
       ),
       body: PremiumBackdrop(
         child: SafeArea(
