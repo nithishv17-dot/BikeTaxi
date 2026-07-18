@@ -24,10 +24,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_currentIndex == 0 ? "RideGo" : "My Profile"),
-        centerTitle: true,
-      ),
+      appBar: _currentIndex == 0
+          ? null
+          : AppBar(
+              title: const Text("My Profile"),
+              centerTitle: true,
+            ),
       body: IndexedStack(
         index: _currentIndex,
         children: [

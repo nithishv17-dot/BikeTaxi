@@ -1260,6 +1260,7 @@ class _DriverScreenState extends State<DriverScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_currentIndex == 0 ? "Captain Panel" : "My Profile"),
+        centerTitle: true,
       ),
       body: PremiumBackdrop(
         child: SafeArea(
