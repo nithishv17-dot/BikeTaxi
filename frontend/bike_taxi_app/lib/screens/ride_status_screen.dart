@@ -1993,26 +1993,26 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                       ),
                       const SizedBox(height: 20),
                       ReflectionCard(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
                               "Route Details",
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w800,
                                 color: AppPalette.slate900,
                               ),
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 10),
                             Container(
-                              padding: const EdgeInsets.all(14),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
                                 color: const Color(
                                   0xFF16A34A,
                                 ).withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: const Color(
                                     0xFF16A34A,
@@ -2024,9 +2024,9 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                   const Icon(
                                     Icons.my_location_rounded,
                                     color: Color(0xFF16A34A),
-                                    size: 24,
+                                    size: 18,
                                   ),
-                                  const SizedBox(width: 14),
+                                  const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -2035,16 +2035,16 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                         const Text(
                                           "Pickup Point",
                                           style: TextStyle(
-                                            fontSize: 13,
+                                            fontSize: 11,
                                             fontWeight: FontWeight.bold,
                                             color: Color(0xFF16A34A),
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 2),
                                         Text(
                                           pickupAddress,
                                           style: const TextStyle(
-                                            fontSize: 15,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.w700,
                                             color: AppPalette.slate900,
                                           ),
@@ -2055,14 +2055,14 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             Container(
-                              padding: const EdgeInsets.all(14),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
                                 color: const Color(
                                   0xFFDC2626,
                                 ).withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: const Color(
                                     0xFFDC2626,
@@ -2074,9 +2074,9 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                   const Icon(
                                     Icons.flag_rounded,
                                     color: Color(0xFFDC2626),
-                                    size: 24,
+                                    size: 18,
                                   ),
-                                  const SizedBox(width: 14),
+                                  const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -2085,16 +2085,16 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                                         const Text(
                                           "Drop Point",
                                           style: TextStyle(
-                                            fontSize: 13,
+                                            fontSize: 11,
                                             fontWeight: FontWeight.bold,
                                             color: Color(0xFFDC2626),
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 2),
                                         Text(
                                           dropAddress,
                                           style: const TextStyle(
-                                            fontSize: 15,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.w700,
                                             color: AppPalette.slate900,
                                           ),
