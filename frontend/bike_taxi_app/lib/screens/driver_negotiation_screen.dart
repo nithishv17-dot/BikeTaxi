@@ -185,6 +185,33 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
     }
   }
 
+  Future<void> declineRide(String rideId) async {
+    setState(() {
+      isSubmitting = true;
+      message = "Declining trip...";
+    });
+
+    try {
+      await ApiService.rejectFare(rideId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Trip declined successfully")),
+      );
+      await fetchNegotiationRides();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Decline failed: ${e.toString()}")),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSubmitting = false;
+        });
+      }
+    }
+  }
+
   Widget _buildRideCard(Map<String, dynamic> ride) {
     final rideId = ride["_id"]?.toString() ?? "";
     final controller = _controllerForRide(rideId);
@@ -214,8 +241,17 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
         (existingOffer["status"] == "pending" ||
             existingOffer["status"] == "accepted_base");
 
+    if (controller.text.isEmpty) {
+      final initialVal = existingOffer.isNotEmpty
+          ? existingOffer["offeredFare"]
+          : ride["estimatedFare"];
+      if (initialVal != null) {
+        controller.text = initialVal.toString();
+      }
+    }
+
     return ReflectionCard(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -223,172 +259,278 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                "Negotiation Trip",
+                "Negotiation Board",
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.w900,
-                  color: AppPalette.slate900,
-                  letterSpacing: -0.3,
+                  color: Colors.white,
+                  letterSpacing: -0.2,
                 ),
               ),
-              if (hasPendingOffer)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppPalette.sky500.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    "PENDING",
-                    style: TextStyle(
-                      color: AppPalette.sky500,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 10,
-                    ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: (hasPendingOffer ? AppPalette.sky500 : const Color(0xFF16A34A)).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  hasPendingOffer ? "PENDING" : "IN PROGRESS",
+                  style: TextStyle(
+                    color: hasPendingOffer ? AppPalette.sky500 : const Color(0xFF4ADE80),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 10,
                   ),
                 ),
+              ),
             ],
           ),
+          const SizedBox(height: 10),
+          const Divider(color: Colors.white12, height: 1),
           const SizedBox(height: 12),
-          // Route Details
+          // Passenger details + Counter inputs
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
-                Icons.circle_outlined,
-                size: 14,
-                color: AppPalette.primary,
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppPalette.primary.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.people_alt_rounded,
+                  color: AppPalette.primary,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  readableLocationLabel(
-                    ride["pickupAddress"]?.toString() ??
-                        ride["pickup"]?.toString(),
-                    fallback: "Pickup address",
-                  ),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: AppPalette.slate900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const Padding(
-            padding: EdgeInsets.only(left: 6),
-            child: SizedBox(
-              height: 14,
-              child: VerticalDivider(
-                thickness: 1.5,
-                width: 2,
-                color: AppPalette.slate500,
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              const Icon(
-                Icons.location_on_rounded,
-                size: 14,
-                color: Color(0xFFEF4444),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  readableLocationLabel(
-                    ride["dropAddress"]?.toString() ??
-                        ride["destination"]?.toString(),
-                    fallback: "Drop address",
-                  ),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: AppPalette.slate900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            "Estimated Fare: Rs. ${formatFareToInt(ride["estimatedFare"])}",
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: AppPalette.slate900,
-            ),
-          ),
-          if (hasPendingOffer) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFBFDBFE)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.hourglass_top_rounded,
-                    color: Color(0xFF2563EB),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      existingOffer["status"] == "accepted_base"
-                          ? "You accepted the base fare (Rs. ${formatFareToInt(ride["estimatedFare"])}). Waiting for rider response."
-                          : "You countered with Rs. ${formatFareToInt(existingOffer["offeredFare"])}. Waiting for rider response.",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E40AF),
-                        fontSize: 13,
-                        height: 1.35,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "New Counter-Offer",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        color: Colors.white,
                       ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "Passenger: ${ride["userId"]?["name"] ?? "Passenger"}",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withOpacity(0.55),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        "Rs. ",
+                        style: TextStyle(
+                          color: AppPalette.primary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(
+                        width: 90,
+                        child: TextField(
+                          controller: controller,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            color: AppPalette.primary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(vertical: 4),
+                            border: UnderlineInputBorder(
+                              borderSide: BorderSide(color: AppPalette.primary),
+                            ),
+                            focusedBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(color: AppPalette.primary, width: 2),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Baseline: Rs. ${formatFareToInt(ride["estimatedFare"])}",
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white.withOpacity(0.4),
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
-            ),
-          ] else ...[
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+            ],
+          ),
+          // Collapsible Route Details
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              title: Text(
+                "View Route Details",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withOpacity(0.55),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              decoration: const InputDecoration(
-                labelText: "Your Offer Amount",
-                hintText: "Enter custom offer in Rs.",
-                prefixIcon: Icon(Icons.sell_rounded),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 12),
               children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: (rideId.isEmpty || isSubmitting)
-                        ? null
-                        : () => submitOffer(rideId),
-                    child: Text(isSubmitting ? "Sending..." : "Send Offer"),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.circle_outlined,
+                      size: 12,
+                      color: AppPalette.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        readableLocationLabel(
+                          ride["pickupAddress"]?.toString() ??
+                              ride["pickup"]?.toString(),
+                          fallback: "Pickup address",
+                        ),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppPalette.slate900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(left: 5),
+                  child: SizedBox(
+                    height: 10,
+                    child: VerticalDivider(
+                      thickness: 1.5,
+                      width: 2,
+                      color: AppPalette.slate500,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: (rideId.isEmpty || isSubmitting)
-                        ? null
-                        : () => submitOffer(rideId, acceptBaseFare: true),
-                    child: Text(isSubmitting ? "Processing..." : "Accept Base"),
-                  ),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on_rounded,
+                      size: 12,
+                      color: Color(0xFFEF4444),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        readableLocationLabel(
+                          ride["dropAddress"]?.toString() ??
+                              ride["destination"]?.toString(),
+                          fallback: "Drop address",
+                        ),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppPalette.slate900,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
+          const SizedBox(height: 12),
+          // Actions
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    backgroundColor: const Color(0xFF1E293B),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  onPressed: isSubmitting ? null : () => declineRide(rideId),
+                  child: const Text(
+                    "Decline",
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: controller,
+                  builder: (context, val, child) {
+                    final valString = val.text.trim();
+                    final valDouble = double.tryParse(valString);
+                    final baseline = double.tryParse(ride["estimatedFare"]?.toString() ?? "") ?? 0.0;
+
+                    String labelText = "Accept Offer";
+                    bool isCounter = false;
+
+                    if (hasPendingOffer) {
+                      labelText = "Update Counter";
+                      isCounter = true;
+                    } else if (valDouble != null && (valDouble - baseline).abs() > 0.01) {
+                      labelText = "Send Counter";
+                      isCounter = true;
+                    }
+
+                    return ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: const Color(0xFFFFB77D),
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: (rideId.isEmpty || isSubmitting)
+                          ? null
+                          : () {
+                              if (isCounter) {
+                                submitOffer(rideId);
+                              } else {
+                                submitOffer(rideId, acceptBaseFare: true);
+                              }
+                            },
+                      child: Text(
+                        isSubmitting ? "Sending..." : labelText,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

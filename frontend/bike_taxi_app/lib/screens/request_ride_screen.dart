@@ -1234,7 +1234,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           elevation: 0,
         ),
         icon: const Icon(Icons.handshake_rounded, size: 19),
-        label: const Text("Negotiate Fare", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+        label: const Text("Start Negotiation", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
       ),
     );
   }

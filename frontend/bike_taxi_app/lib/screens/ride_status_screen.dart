@@ -2226,6 +2226,31 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
+                      if (!widget.isDriver &&
+                          (status == "requested" ||
+                           status == "negotiating" ||
+                           status == "negotiation_expired")) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              foregroundColor: Colors.redAccent,
+                              side: const BorderSide(color: Colors.redAccent),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: actionLoading ? null : cancelRide,
+                            icon: const Icon(Icons.cancel_outlined, size: 18),
+                            label: const Text(
+                              "Cancel Ride Request",
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
                       if (status == "accepted") ...[
                         if (widget.isDriver) ...[
                           TextField(

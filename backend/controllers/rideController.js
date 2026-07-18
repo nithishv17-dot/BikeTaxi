@@ -254,8 +254,6 @@ exports.requestRide = async (req, res) => {
         dropLongitude
       ));
 
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
-
     const ridePayload = {
       userId,
       pickup: resolvedPickupAddress,
@@ -271,7 +269,7 @@ exports.requestRide = async (req, res) => {
       paymentMethod: requestedPaymentMethod,
       paymentStatus: "Pending",
       bookingMode: requestedBookingMode,
-      otp,
+      otp: "",
       estimatedFare,
       initialFare: estimatedFare,
       offeredFare: estimatedFare,
@@ -376,6 +374,7 @@ exports.acceptRide = async (req, res) => {
     }
 
     ride.status = "accepted";
+    ride.otp = Math.floor(1000 + Math.random() * 9000).toString();
     await ride.save();
 
     io.emit("rideAccepted", ride);
@@ -809,6 +808,7 @@ exports.confirmRideOffer = async (req, res) => {
     ride.finalFare = selectedOffer.offeredFare;
     ride.offeredFare = selectedOffer.offeredFare;
     ride.negotiationExpiresAt = null;
+    ride.otp = Math.floor(1000 + Math.random() * 9000).toString();
     await ride.save();
 
     const driver = await User.findById(selectedOffer.driverId);
