@@ -1855,6 +1855,22 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       );
     }
 
+    final bool hasRoute = pickupLat != destinationLat || pickupLng != destinationLng;
+    final MapOptions mapOptions = !hasRoute
+        ? MapOptions(
+            initialCenter: LatLng(pickupLat, pickupLng),
+            initialZoom: 13,
+          )
+        : MapOptions(
+            initialCameraFit: CameraFit.bounds(
+              bounds: LatLngBounds.fromPoints([
+                LatLng(pickupLat, pickupLng),
+                LatLng(destinationLat, destinationLng),
+              ]),
+              padding: const EdgeInsets.all(50),
+            ),
+          );
+
     return SizedBox(
       height: 280,
       child: ClipRRect(
@@ -1862,15 +1878,27 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         child: Stack(
           children: [
             FlutterMap(
-              options: MapOptions(
-                initialCenter: LatLng(pickupLat, pickupLng),
-                initialZoom: 13,
-              ),
+              options: mapOptions,
               children: [
                 TileLayer(
                   urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                   userAgentPackageName: "com.example.bike_taxi_app",
                 ),
+                if (hasRoute)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: [
+                          LatLng(pickupLat, pickupLng),
+                          LatLng(destinationLat, destinationLng),
+                        ],
+                        color: const Color(0xFFF4A261),
+                        strokeWidth: 5.0,
+                        borderColor: Colors.white.withOpacity(0.4),
+                        borderStrokeWidth: 2.0,
+                      ),
+                    ],
+                  ),
                 MarkerLayer(markers: markers),
               ],
             ),
