@@ -1807,7 +1807,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     );
   }
 
-  Widget _buildMap() {
+  Widget _buildMap(String status) {
     final double pickupLat = _toDouble(ride?["pickupLat"]) ?? 0;
     final double pickupLng = _toDouble(ride?["pickupLng"]) ?? 0;
     final double destinationLat =
@@ -1855,20 +1855,64 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     }
 
     return SizedBox(
-      height: 260,
+      height: 280,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: FlutterMap(
-          options: MapOptions(
-            initialCenter: LatLng(pickupLat, pickupLng),
-            initialZoom: 13,
-          ),
+        borderRadius: BorderRadius.circular(28),
+        child: Stack(
           children: [
-            TileLayer(
-              urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-              userAgentPackageName: "com.example.bike_taxi_app",
+            FlutterMap(
+              options: MapOptions(
+                initialCenter: LatLng(pickupLat, pickupLng),
+                initialZoom: 13,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                  userAgentPackageName: "com.example.bike_taxi_app",
+                ),
+                MarkerLayer(markers: markers),
+              ],
             ),
-            MarkerLayer(markers: markers),
+            Positioned(
+              top: 14,
+              left: 14,
+              right: 14,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B).withOpacity(0.75),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.12),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Live Ride Overview",
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        _buildStatusChip(status),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -1915,28 +1959,8 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       ReflectionCard(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  "Live Ride Overview",
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppPalette.slate900,
-                                  ),
-                                ),
-                                _buildStatusChip(status),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            _buildMap(),
-                          ],
-                        ),
+                        padding: EdgeInsets.zero,
+                        child: _buildMap(status),
                       ),
                       const SizedBox(height: 20),
                       ReflectionCard(
