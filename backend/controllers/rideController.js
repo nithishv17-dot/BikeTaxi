@@ -400,6 +400,23 @@ exports.requestRide = async (req, res) => {
     await ride.save();
 
     if (driver) {
+      // Cancel any other active/pending requested normal rides assigned to this driver
+      const duplicateRequests = await Ride.find({
+        driverId: driver._id,
+        status: "requested",
+        bookingMode: "normal"
+      });
+      for (const oldReq of duplicateRequests) {
+        oldReq.status = "cancelled";
+        await oldReq.save();
+        if (io) {
+          const refreshedOld = await getPopulatedRide(oldReq._id);
+          if (refreshedOld) {
+            io.emit("rideCancelled", refreshedOld);
+          }
+        }
+      }
+
       driver.isAvailable = false;
       await driver.save();
     }

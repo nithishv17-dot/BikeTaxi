@@ -234,7 +234,16 @@ class _DriverScreenState extends State<DriverScreen> {
       });
     }
     try {
-      final response = await ApiService.getDrivers();
+      final results = await Future.wait([
+        ApiService.getDrivers(),
+        ApiService.getDriverRequests(widget.driverId),
+        ApiService.getDriverNegotiationRides(widget.driverId),
+      ]);
+
+      final response = results[0];
+      final requestsResponse = results[1];
+      final negotiationResponse = results[2];
+
       final drivers = List<Map<String, dynamic>>.from(
         (response["drivers"] as List<dynamic>? ?? const []).whereType<Map>(),
       );
@@ -243,17 +252,11 @@ class _DriverScreenState extends State<DriverScreen> {
         orElse: () => <String, dynamic>{},
       );
 
-      final requestsResponse = await ApiService.getDriverRequests(
-        widget.driverId,
-      );
       final fetchedRequests = List<Map<String, dynamic>>.from(
         (requestsResponse["rides"] as List<dynamic>? ?? const [])
             .whereType<Map>(),
       );
 
-      final negotiationResponse = await ApiService.getDriverNegotiationRides(
-        widget.driverId,
-      );
       final fetchedNegotiations = List<Map<String, dynamic>>.from(
         (negotiationResponse["rides"] as List<dynamic>? ?? const [])
             .whereType<Map>(),

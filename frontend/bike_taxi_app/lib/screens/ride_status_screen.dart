@@ -2260,7 +2260,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                             ),
                             subtitle: null,
                             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                            children: (bookingMode == "normal" && driverMap == null)
+                            children: (status == "requested" || status == "negotiating" || status == "negotiation_expired")
                                 ? []
                                 : [
                                     _buildInfoRow("Booking Mode", bookingMode),
