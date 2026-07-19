@@ -333,9 +333,7 @@ exports.requestRide = async (req, res) => {
     const availableDrivers = await User.find({
       role: "driver",
       isAvailable: true,
-      _id: { $nin: busyDriverIds },
-      "location.lat": { $ne: 0 },
-      "location.lng": { $ne: 0 }
+      _id: { $nin: busyDriverIds }
     });
 
     if (!availableDrivers.length) {
