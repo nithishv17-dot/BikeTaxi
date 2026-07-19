@@ -1555,7 +1555,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          if (offers.isEmpty)
+          if (!isNegotiationRide || offers.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 20),
               child: Column(
@@ -1767,54 +1767,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     );
   }
 
-  Widget _buildNormalWaitingCard() {
-    return ReflectionCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Finding Your Ride",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppPalette.primary.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppPalette.primary.withOpacity(0.22)),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppPalette.primary,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    negotiationSecondsRemaining > 0
-                        ? "Waiting for driver confirmation · ${_formatCountdown(negotiationSecondsRemaining)} remaining"
-                        : "Processing request…",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: AppPalette.primary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Deleted _buildNormalWaitingCard
 
   Widget _buildExpiredNegotiationCard() {
     return Container(
@@ -2178,12 +2131,8 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                           dropAddress: dropAddress,
                         ),
                       ],
-                      if (isNegotiationWaiting) ...[
+                      if (isWaiting) ...[
                         _buildOffersSection(),
-                        const SizedBox(height: 20),
-                      ],
-                      if (isNormalWaiting) ...[
-                        _buildNormalWaitingCard(),
                         const SizedBox(height: 20),
                       ],
                       if (isNegotiationExpired) ...[
@@ -2208,21 +2157,23 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                             ),
                             subtitle: null,
                             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                            children: [
-                              _buildInfoRow("Booking Mode", bookingMode),
-                              _buildInfoRow("Fare", "Rs. $fare"),
-                              _buildInfoRow("Offered Fare", offeredFare),
-                              _buildInfoRow("Negotiation", negotiationStatus),
-                              _buildInfoRow("Payment Method", paymentMethod),
-                              _buildInfoRow(
-                                "Driver",
-                                "${driverMap?["name"] ?? "N/A"}",
-                              ),
-                              _buildInfoRow(
-                                "Phone",
-                                "${driverMap?["phone"] ?? "N/A"}",
-                              ),
-                            ],
+                            children: (bookingMode == "normal" && driverMap == null)
+                                ? []
+                                : [
+                                    _buildInfoRow("Booking Mode", bookingMode),
+                                    _buildInfoRow("Fare", "Rs. $fare"),
+                                    _buildInfoRow("Offered Fare", offeredFare),
+                                    _buildInfoRow("Negotiation", negotiationStatus),
+                                    _buildInfoRow("Payment Method", paymentMethod),
+                                    _buildInfoRow(
+                                      "Driver",
+                                      "${driverMap?["name"] ?? "N/A"}",
+                                    ),
+                                    _buildInfoRow(
+                                      "Phone",
+                                      "${driverMap?["phone"] ?? "N/A"}",
+                                    ),
+                                  ],
                           ),
                         ),
                       ),

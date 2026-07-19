@@ -234,6 +234,36 @@ exports.requestRide = async (req, res) => {
       });
     }
 
+    // Cancel any previous active rides for this user to avoid conflicts
+    const activeRides = await Ride.find({
+      userId,
+      status: { $in: ["requested", "negotiating", "accepted", "ongoing"] }
+    });
+
+    for (const oldRide of activeRides) {
+      oldRide.status = "cancelled";
+      if (oldRide.bookingMode === "negotiation") {
+        oldRide.negotiationStatus = "rejected";
+        oldRide.negotiationExpiresAt = null;
+      }
+      await oldRide.save();
+
+      // Release driver if assigned
+      if (oldRide.driverId) {
+        const oldDriver = await User.findById(oldRide.driverId);
+        if (oldDriver) {
+          oldDriver.isAvailable = true;
+          await oldDriver.save();
+        }
+      }
+      
+      // Emit event
+      const refreshedOldRide = await getPopulatedRide(oldRide._id);
+      if (refreshedOldRide && io) {
+        io.emit("rideCancelled", refreshedOldRide);
+      }
+    }
+
     const availableDrivers = await User.find({
       role: "driver",
       isAvailable: true

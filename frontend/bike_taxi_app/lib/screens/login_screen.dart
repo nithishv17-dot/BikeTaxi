@@ -333,67 +333,59 @@ class _LoginScreenState extends State<LoginScreen> {
                       delay: const Duration(milliseconds: 40),
                       beginOffset: const Offset(0, -0.1),
                       child: ReflectiveBanner(
-                        colors: const [AppPalette.primary, Color(0xFF4F46E5)],
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: const [
-                                  Icon(
-                                    Icons.two_wheeler_rounded,
-                                    color: Colors.white,
-                                    size: 34,
+                        colors: const [Color(0xFFF97316), Color(0xFF818CF8)],
+                        padding: EdgeInsets.zero,
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(22, 24, 16, 24),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: const [
+                                      Icon(
+                                        Icons.two_wheeler_rounded,
+                                        color: Colors.white,
+                                        size: 34,
+                                      ),
+                                      SizedBox(height: 14),
+                                      Text(
+                                        "DotTaxi",
+                                        style: TextStyle(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                          letterSpacing: -0.3,
+                                        ),
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        "Fast booking, live tracking, and seamless payment in one premium experience.",
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontWeight: FontWeight.w600,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  SizedBox(height: 14),
-                                  Text(
-                                    "DotTaxi",
-                                    style: TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                      letterSpacing: -0.3,
-                                    ),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    "Fast booking, live tracking, and seamless payment in one premium experience.",
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.24),
-                                  width: 1.5,
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.25),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
                               ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(15),
+                              ClipRRect(
+                                borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(30),
+                                  bottomRight: Radius.circular(30),
+                                ),
                                 child: Image.asset(
                                   "assets/icon/app_icon.jpg",
-                                  width: 72,
-                                  height: 72,
+                                  width: 130,
                                   fit: BoxFit.cover,
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
