@@ -441,15 +441,16 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   }
 
   void _fitMapToRoute() {
-    if (pickupLat == null || dropLat == null) return;
-    final bounds = _roadRoutePoints.isNotEmpty
-        ? LatLngBounds.fromPoints(_roadRoutePoints)
+    if (pickupLat == null || dropLat == null || pickupLat == 0.0 || dropLat == 0.0 || pickupLng == 0.0 || dropLng == 0.0) return;
+    final validPoints = _roadRoutePoints.where((p) => p.latitude != 0.0 && p.longitude != 0.0).toList();
+    final bounds = validPoints.isNotEmpty
+        ? LatLngBounds.fromPoints(validPoints)
         : LatLngBounds.fromPoints([
             LatLng(pickupLat!, pickupLng!),
             LatLng(dropLat!, dropLng!),
           ]);
     try {
-      _mapController.fitCamera(CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.fromLTRB(60, 120, 60, 320)));
+      _mapController.fitCamera(CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.fromLTRB(70, 130, 70, 330)));
     } catch (_) {}
   }
 
@@ -608,7 +609,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       }
     });
 
-    if (!isPickup && _phase == _BookingPhase.initial && pickupLat != null && dropLat != null && !_hasSamePickupAndDrop) {
+    if (_phase == _BookingPhase.initial && pickupLat != null && dropLat != null && !_hasSamePickupAndDrop) {
       _startRouteSequence();
     }
     _saveToPrefs();

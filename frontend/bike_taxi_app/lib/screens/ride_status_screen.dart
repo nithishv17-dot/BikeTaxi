@@ -1977,23 +1977,26 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       );
     }
 
-    final bool hasRoute = pickupLat != destinationLat || pickupLng != destinationLng;
-    final bounds = _roadRoutePoints.isNotEmpty
-        ? LatLngBounds.fromPoints(_roadRoutePoints)
-        : LatLngBounds.fromPoints([
-            LatLng(pickupLat, pickupLng),
-            LatLng(destinationLat, destinationLng),
-          ]);
+    final bool hasRoute = pickupLat != 0.0 && destinationLat != 0.0 && (pickupLat != destinationLat || pickupLng != destinationLng);
+    final validPoints = _roadRoutePoints.where((p) => p.latitude != 0.0 && p.longitude != 0.0).toList();
+    final bounds = hasRoute
+        ? (validPoints.isNotEmpty
+            ? LatLngBounds.fromPoints(validPoints)
+            : LatLngBounds.fromPoints([
+                LatLng(pickupLat, pickupLng),
+                LatLng(destinationLat, destinationLng),
+              ]))
+        : null;
 
-    final mapOptions = !hasRoute
+    final mapOptions = bounds == null
         ? MapOptions(
-            initialCenter: LatLng(pickupLat, pickupLng),
+            initialCenter: LatLng(pickupLat != 0.0 ? pickupLat : 11.0, pickupLng != 0.0 ? pickupLng : 77.0),
             initialZoom: 14.5,
           )
         : MapOptions(
             initialCameraFit: CameraFit.bounds(
               bounds: bounds,
-              padding: const EdgeInsets.all(50),
+              padding: const EdgeInsets.all(70),
             ),
           );
 

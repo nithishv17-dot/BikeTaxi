@@ -319,9 +319,16 @@ exports.requestRide = async (req, res) => {
       }
     }
 
+    const activeRides = await Ride.find({
+      status: { $in: ["requested", "accepted", "started", "negotiating"] },
+      driverId: { $ne: null }
+    });
+    const busyDriverIds = activeRides.map(r => r.driverId.toString());
+
     const availableDrivers = await User.find({
       role: "driver",
-      isAvailable: true
+      isAvailable: true,
+      _id: { $nin: busyDriverIds }
     });
 
     if (!availableDrivers.length) {
@@ -402,6 +409,7 @@ exports.requestRide = async (req, res) => {
     if (driver) {
       // Cancel any other active/pending requested normal rides assigned to this driver
       const duplicateRequests = await Ride.find({
+        _id: { $ne: ride._id },
         driverId: driver._id,
         status: "requested",
         bookingMode: "normal"
@@ -416,9 +424,6 @@ exports.requestRide = async (req, res) => {
           }
         }
       }
-
-      driver.isAvailable = false;
-      await driver.save();
     }
 
     io.emit("rideRequested", ride);
