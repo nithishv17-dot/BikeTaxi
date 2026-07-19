@@ -41,6 +41,27 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+app.get("/api/cleanup-rides", async (req, res) => {
+  try {
+    const Ride = require("./models/Ride");
+    const User = require("./models/User");
+    const result = await Ride.updateMany(
+      { status: { $in: ["requested", "negotiating", "accepted", "ongoing"] } },
+      { $set: { status: "cancelled", negotiationStatus: "rejected", negotiationExpiresAt: null } }
+    );
+    await User.updateMany(
+      { role: "driver" },
+      { $set: { isAvailable: true } }
+    );
+    res.json({
+      message: "Database cleanup completed successfully.",
+      cancelledRidesCount: result.modifiedCount
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 /* ---------------- ROUTES ---------------- */
 
 app.use("/api/users",userRoutes);
