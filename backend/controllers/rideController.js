@@ -1,6 +1,54 @@
+const mongoose = require("mongoose");
 const Ride = require("../models/Ride");
 const User = require("../models/User");
 const { calculateFare } = require("../services/fareService");
+
+const extractObjectId = (input) => {
+  if (!input) return null;
+  
+  if (typeof input === "string" && mongoose.Types.ObjectId.isValid(input)) {
+    return input;
+  }
+  
+  if (input instanceof mongoose.Types.ObjectId) {
+    return input.toString();
+  }
+
+  if (typeof input === "object") {
+    const idVal = input._id || input.id;
+    if (idVal && mongoose.Types.ObjectId.isValid(idVal.toString())) {
+      return idVal.toString();
+    }
+  }
+
+  if (typeof input === "string") {
+    let cleaned = input.trim();
+    if (cleaned.startsWith("{") && cleaned.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(cleaned);
+        const idVal = parsed._id || parsed.id;
+        if (idVal && mongoose.Types.ObjectId.isValid(idVal.toString())) {
+          return idVal.toString();
+        }
+      } catch (e) {
+        const match = cleaned.match(/_id\s*:\s*["']?([a-fA-F0-9]{24})["']?/);
+        if (match && match[1]) {
+          return match[1];
+        }
+        const hexMatch = cleaned.match(/([a-fA-F0-9]{24})/);
+        if (hexMatch && hexMatch[1]) {
+          return hexMatch[1];
+        }
+      }
+    }
+    const directHexMatch = cleaned.match(/([a-fA-F0-9]{24})/);
+    if (directHexMatch && directHexMatch[1]) {
+      return directHexMatch[1];
+    }
+  }
+
+  return null;
+};
 
 const VALID_PAYMENT_METHODS = new Set(["Cash", "UPI", "Card"]);
 const VALID_BOOKING_MODES = new Set(["normal", "negotiation"]);
@@ -179,6 +227,13 @@ exports.requestRide = async (req, res) => {
       bookingMode
     } = req.body;
 
+    const extractedUserId = extractObjectId(userId);
+    if (!extractedUserId || !mongoose.Types.ObjectId.isValid(extractedUserId)) {
+      return res.status(400).json({
+        message: "Invalid or malformed user id"
+      });
+    }
+
     const resolvedPickupAddress = normalizeText(pickupAddress || pickup);
     const resolvedDropAddress = normalizeText(dropAddress || destination);
     const pickupLatitude = parseCoordinate(pickupLat);
@@ -189,7 +244,7 @@ exports.requestRide = async (req, res) => {
     const requestedBookingMode = normalizeText(bookingMode) || "normal";
 
     if (
-      !userId ||
+      !extractedUserId ||
       !resolvedPickupAddress ||
       !resolvedDropAddress ||
       pickupLatitude === null ||
@@ -226,7 +281,7 @@ exports.requestRide = async (req, res) => {
       });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(extractedUserId);
 
     if (!user) {
       return res.status(404).json({
@@ -236,7 +291,7 @@ exports.requestRide = async (req, res) => {
 
     // Cancel any previous active rides for this user to avoid conflicts
     const activeRides = await Ride.find({
-      userId,
+      userId: extractedUserId,
       status: { $in: ["requested", "negotiating", "accepted", "ongoing"] }
     });
 
@@ -285,7 +340,7 @@ exports.requestRide = async (req, res) => {
       ));
 
     const ridePayload = {
-      userId,
+      userId: extractedUserId,
       pickup: resolvedPickupAddress,
       pickupAddress: resolvedPickupAddress,
       pickupLat: pickupLatitude,
@@ -580,7 +635,13 @@ exports.cancelRide = async (req, res) => {
 
 exports.getUserRides = async (req, res) => {
   try {
-    const rides = await Ride.find({ userId: req.params.userId })
+    const extractedUserId = extractObjectId(req.params.userId);
+    if (!extractedUserId || !mongoose.Types.ObjectId.isValid(extractedUserId)) {
+      return res.status(400).json({
+        message: "Invalid or malformed user id"
+      });
+    }
+    const rides = await Ride.find({ userId: extractedUserId })
       .populate("driverId", "name phone")
       .sort({ createdAt: -1 });
 
@@ -662,7 +723,12 @@ exports.getRideOffers = async (req, res) => {
 exports.getDriverNegotiationRides = async (req, res) => {
   try {
     const io = req.app.get("io");
-    const driverId = req.params.driverId;
+    const extractedDriverId = extractObjectId(req.params.driverId);
+    if (!extractedDriverId || !mongoose.Types.ObjectId.isValid(extractedDriverId)) {
+      return res.status(400).json({
+        message: "Invalid or malformed driver id"
+      });
+    }
     const rides = await Ride.find({
       status: "negotiating",
       negotiationStatus: { $in: ["open", "countered"] }
@@ -676,7 +742,7 @@ exports.getDriverNegotiationRides = async (req, res) => {
 
     const filteredRides = activeRides.filter((ride) => {
       const existingOffer = ride.offers.find(
-        (offer) => offer.driverId.toString() === driverId
+        (offer) => offer.driverId.toString() === extractedDriverId
       );
 
       return !existingOffer || existingOffer.status === "pending" || existingOffer.status === "accepted_base";
@@ -696,10 +762,15 @@ exports.getDriverNegotiationRides = async (req, res) => {
 
 exports.getDriverRequests = async (req, res) => {
   try {
-    const driverId = req.params.driverId;
+    const extractedDriverId = extractObjectId(req.params.driverId);
+    if (!extractedDriverId || !mongoose.Types.ObjectId.isValid(extractedDriverId)) {
+      return res.status(400).json({
+        message: "Invalid or malformed driver id"
+      });
+    }
     const rides = await Ride.find({
       status: "requested",
-      driverId: driverId
+      driverId: extractedDriverId
     })
       .populate("userId", "name phone")
       .sort({ createdAt: -1 });
@@ -719,6 +790,12 @@ exports.getDriverRequests = async (req, res) => {
 exports.submitRideOffer = async (req, res) => {
   try {
     const { driverId, offeredFare, acceptBaseFare } = req.body;
+    const extractedDriverId = extractObjectId(driverId);
+    if (!extractedDriverId || !mongoose.Types.ObjectId.isValid(extractedDriverId)) {
+      return res.status(400).json({
+        message: "Invalid or malformed driver id"
+      });
+    }
     const { ride: actionableRide, io } = await ensureRideIsActionable(
       req,
       req.params.id
@@ -737,7 +814,7 @@ exports.submitRideOffer = async (req, res) => {
       });
     }
 
-    const driver = await User.findById(driverId);
+    const driver = await User.findById(extractedDriverId);
 
     if (!driver || driver.role !== "driver" || !driver.isAvailable) {
       return res.status(404).json({
@@ -756,7 +833,7 @@ exports.submitRideOffer = async (req, res) => {
     }
 
     const existingOffer = ride.offers.find(
-      (offer) => offer.driverId.toString() === driverId
+      (offer) => offer.driverId.toString() === extractedDriverId
     );
 
     if (existingOffer) {
@@ -766,7 +843,7 @@ exports.submitRideOffer = async (req, res) => {
       existingOffer.driverPhone = driver.phone || "";
     } else {
       ride.offers.push({
-        driverId,
+        driverId: extractedDriverId,
         driverName: driver.name,
         driverPhone: driver.phone || "",
         offeredFare: nextFare,
@@ -813,6 +890,12 @@ exports.confirmRideOffer = async (req, res) => {
     );
     let ride = actionableRide;
     const { offerId } = req.body;
+    const extractedOfferId = extractObjectId(offerId);
+    if (!extractedOfferId || !mongoose.Types.ObjectId.isValid(extractedOfferId)) {
+      return res.status(400).json({
+        message: "Invalid or malformed offer id"
+      });
+    }
 
     if (!ride) {
       return res.status(404).json({
@@ -826,7 +909,7 @@ exports.confirmRideOffer = async (req, res) => {
       });
     }
 
-    const selectedOffer = ride.offers.id(offerId);
+    const selectedOffer = ride.offers.id(extractedOfferId);
 
     if (!selectedOffer) {
       return res.status(404).json({
@@ -834,7 +917,7 @@ exports.confirmRideOffer = async (req, res) => {
       });
     }
 
-    markOffersClosed(ride, offerId);
+    markOffersClosed(ride, extractedOfferId);
     ride.driverId = selectedOffer.driverId;
     ride.status = "accepted";
     ride.negotiationStatus = "accepted";

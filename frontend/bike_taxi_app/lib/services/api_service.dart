@@ -1,7 +1,13 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
+import 'session_service.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class ApiService {
   static String get baseUrl => AppConfig.apiBaseUrl;
@@ -432,9 +438,41 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  static void _handleUnauthorized() async {
+    token = null;
+    SessionService.clearSession();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+    } catch (_) {}
+
+    final context = navigatorKey.currentContext;
+    if (context != null && context.mounted) {
+      context.go('/login');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            "Your account was logged in from another device. Please log in again.",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.red.shade800,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
   static dynamic _handleResponse(http.Response response) {
     print("STATUS CODE: ${response.statusCode}");
     print("RAW RESPONSE BODY: ${response.body}");
+
+    if (response.statusCode == 401) {
+      _handleUnauthorized();
+      throw Exception(
+        "Your account was logged in from another device. Please log in again.",
+      );
+    }
 
     dynamic data;
 

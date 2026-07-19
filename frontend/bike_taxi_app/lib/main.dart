@@ -13,6 +13,7 @@ import 'services/socket_service.dart';
 import 'theme/premium_ui.dart';
 
 final GoRouter _router = GoRouter(
+  navigatorKey: navigatorKey,
   initialLocation: '/',
   routes: [
     GoRoute(

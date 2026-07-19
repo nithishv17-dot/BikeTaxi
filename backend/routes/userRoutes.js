@@ -80,13 +80,18 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      "secretkey",
+      { expiresIn: "7d" }
+    );
+
+    user.active_session_token = token;
+    await user.save();
+
     return res.status(200).json({
       message: "Login successful",
-      token: jwt.sign(
-        { id: user._id, role: user.role },
-        "secretkey",
-        { expiresIn: "7d" }
-      ),
+      token,
       userId: user._id,
       role: user.role,
       isAvailable: user.isAvailable || false,
