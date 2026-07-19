@@ -287,7 +287,15 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       );
       if (!mounted) return;
       setState(() {
-        availableDrivers = list.where((d) => d["isAvailable"] == true).toList();
+        availableDrivers = list.where((d) {
+          if (d["isAvailable"] != true) return false;
+          final loc = d["location"];
+          if (loc == null) return false;
+          final lat = loc["lat"] is num ? (loc["lat"] as num).toDouble() : double.tryParse("${loc["lat"]}");
+          final lng = loc["lng"] is num ? (loc["lng"] as num).toDouble() : double.tryParse("${loc["lng"]}");
+          if (lat == null || lng == null || lat == 0.0 || lng == 0.0) return false;
+          return true;
+        }).toList();
       });
     } catch (_) {}
   }

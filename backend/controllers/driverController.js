@@ -4,7 +4,11 @@ const User = require("../models/User");
 exports.getDrivers = async (req, res) => {
   try {
     const drivers = await User.find(
-      { role: "driver" },
+      {
+        role: "driver",
+        "location.lat": { $ne: 0 },
+        "location.lng": { $ne: 0 }
+      },
       { name: 1, phone: 1, isAvailable: 1, role: 1, location: 1 }
     ).lean();
 
