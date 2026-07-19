@@ -62,6 +62,16 @@ app.get("/api/cleanup-rides", async (req, res) => {
   }
 });
 
+app.get("/api/list-normal-rides", async (req, res) => {
+  try {
+    const Ride = require("./models/Ride");
+    const rides = await Ride.find({ bookingMode: "normal" }).sort({ createdAt: -1 }).limit(10).lean();
+    res.json({ rides });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 /* ---------------- ROUTES ---------------- */
 
 app.use("/api/users",userRoutes);
