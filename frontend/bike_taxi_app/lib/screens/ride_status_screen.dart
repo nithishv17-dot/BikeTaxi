@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
+import '../services/routing_service.dart';
 import '../theme/premium_ui.dart';
 import '../utils/location_display.dart';
 import 'driver_screen.dart';
@@ -44,6 +45,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
 
   bool normalModeTimeout = false;
   Timer? _normalTimeoutTimer;
+  List<LatLng> _roadRoutePoints = [];
 
   RideMode get rideMode => isNegotiationRide ? RideMode.negotiation : RideMode.normal;
 
@@ -166,6 +168,15 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     });
   }
 
+  void _fetchRoadRoute(double startLat, double startLng, double endLat, double endLng) async {
+    final result = await RoutingService.getRoute(startLat, startLng, endLat, endLng);
+    if (result != null && mounted) {
+      setState(() {
+        _roadRoutePoints = result.points;
+      });
+    }
+  }
+
   void _applyRide(Map<String, dynamic>? nextRide, {String? nextMessage}) {
     if (!mounted) {
       return;
@@ -182,6 +193,17 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     _syncCountdownFromRide();
 
     if (nextRide != null) {
+      final double pickupLat = _toDouble(nextRide["pickupLat"]) ?? 0;
+      final double pickupLng = _toDouble(nextRide["pickupLng"]) ?? 0;
+      final double destinationLat =
+          _toDouble(nextRide["dropLat"] ?? nextRide["destinationLat"]) ?? pickupLat;
+      final double destinationLng =
+          _toDouble(nextRide["dropLng"] ?? nextRide["destinationLng"]) ?? pickupLng;
+
+      if (pickupLat != 0 && destinationLat != 0 && _roadRoutePoints.isEmpty) {
+        _fetchRoadRoute(pickupLat, pickupLng, destinationLat, destinationLng);
+      }
+
       final status = nextRide["status"]?.toString();
       final paymentStatus = nextRide["paymentStatus"]?.toString();
 
@@ -190,22 +212,9 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         Future.delayed(const Duration(seconds: 2), () {
           if (!mounted) return;
           if (widget.isDriver) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DriverScreen(
-                  driverId: nextRide["driverId"]?.toString() ?? "",
-                ),
-              ),
-            );
+            context.go('/driver');
           } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    HomeScreen(userId: nextRide["userId"]?.toString() ?? ""),
-              ),
-            );
+            context.go('/home');
           }
         });
       }
@@ -1969,17 +1978,21 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     }
 
     final bool hasRoute = pickupLat != destinationLat || pickupLng != destinationLng;
-    final MapOptions mapOptions = !hasRoute
+    final bounds = _roadRoutePoints.isNotEmpty
+        ? LatLngBounds.fromPoints(_roadRoutePoints)
+        : LatLngBounds.fromPoints([
+            LatLng(pickupLat, pickupLng),
+            LatLng(destinationLat, destinationLng),
+          ]);
+
+    final mapOptions = !hasRoute
         ? MapOptions(
             initialCenter: LatLng(pickupLat, pickupLng),
-            initialZoom: 13,
+            initialZoom: 14.5,
           )
         : MapOptions(
             initialCameraFit: CameraFit.bounds(
-              bounds: LatLngBounds.fromPoints([
-                LatLng(pickupLat, pickupLng),
-                LatLng(destinationLat, destinationLng),
-              ]),
+              bounds: bounds,
               padding: const EdgeInsets.all(50),
             ),
           );
@@ -2001,10 +2014,12 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                   PolylineLayer(
                     polylines: [
                       Polyline(
-                        points: [
-                          LatLng(pickupLat, pickupLng),
-                          LatLng(destinationLat, destinationLng),
-                        ],
+                        points: _roadRoutePoints.isNotEmpty
+                            ? _roadRoutePoints
+                            : [
+                                LatLng(pickupLat, pickupLng),
+                                LatLng(destinationLat, destinationLng),
+                              ],
                         color: const Color(0xFFF4A261),
                         strokeWidth: 5.0,
                         borderColor: Colors.white.withOpacity(0.4),

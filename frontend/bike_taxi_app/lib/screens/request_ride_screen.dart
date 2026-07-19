@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
 import '../services/socket_service.dart';
+import '../services/routing_service.dart';
 import '../theme/premium_ui.dart';
 import '../utils/location_display.dart';
 import 'ride_status_screen.dart';
@@ -63,6 +64,10 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   bool isResolvingCurrentLocation = false;
   String? currentLocationMessage;
   double? currentLat;
+  
+  List<LatLng> _roadRoutePoints = [];
+  double? _apiDistanceKm;
+  double? _apiDurationMinutes;
   double? currentLng;
   List<Map<String, dynamic>> availableDrivers = [];
   Timer? _driversPollTimer;
@@ -326,6 +331,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
   // ── Mathematical Calculations ──────────────────────────────────────────────
   double? get _distanceKm {
+    if (_apiDistanceKm != null) return _apiDistanceKm;
     if (pickupLat == null || pickupLng == null || dropLat == null || dropLng == null) return null;
     const double earthRadiusKm = 6371;
     final double dLat = (dropLat! - pickupLat!) * pi / 180;
@@ -357,16 +363,47 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   }
 
   String get _etaText {
+    if (_apiDurationMinutes != null) {
+      return "${_apiDurationMinutes!.ceil()} min";
+    }
     final km = _distanceKm;
     if (km == null) return "--";
     return "${(km / 25 * 60).ceil()} min";
   }
 
   // ── Animation Sequence ───────────────────────────────────────────────────
+  Future<void> _fetchRoadRoute() async {
+    if (pickupLat == null || pickupLng == null || dropLat == null || dropLng == null) return;
+    try {
+      final result = await RoutingService.getRoute(pickupLat!, pickupLng!, dropLat!, dropLng!);
+      if (result != null) {
+        setState(() {
+          _roadRoutePoints = result.points;
+          _apiDistanceKm = result.distanceKm;
+          _apiDurationMinutes = result.durationMinutes;
+        });
+      } else {
+        setState(() {
+          _roadRoutePoints = [LatLng(pickupLat!, pickupLng!), LatLng(dropLat!, dropLng!)];
+          _apiDistanceKm = null;
+          _apiDurationMinutes = null;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _roadRoutePoints = [LatLng(pickupLat!, pickupLng!), LatLng(dropLat!, dropLng!)];
+        _apiDistanceKm = null;
+        _apiDurationMinutes = null;
+      });
+    }
+  }
+
   Future<void> _startRouteSequence() async {
     if (!mounted) return;
     setState(() => _phase = _BookingPhase.calculating);
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    
+    await _fetchRoadRoute();
+    
     if (!mounted) return;
 
     _routeAnimCtrl.reset();
@@ -405,10 +442,12 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
   void _fitMapToRoute() {
     if (pickupLat == null || dropLat == null) return;
-    final bounds = LatLngBounds.fromPoints([
-      LatLng(pickupLat!, pickupLng!),
-      LatLng(dropLat!, dropLng!),
-    ]);
+    final bounds = _roadRoutePoints.isNotEmpty
+        ? LatLngBounds.fromPoints(_roadRoutePoints)
+        : LatLngBounds.fromPoints([
+            LatLng(pickupLat!, pickupLng!),
+            LatLng(dropLat!, dropLng!),
+          ]);
     try {
       _mapController.fitCamera(CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.fromLTRB(60, 120, 60, 320)));
     } catch (_) {}
@@ -789,7 +828,13 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         final markerOp = _markerOpacity.value;
         List<LatLng> polylinePoints = [];
         if (pickupLat != null && dropLat != null && progress > 0) {
-          polylinePoints = [LatLng(pickupLat!, pickupLng!), LatLng(pickupLat! + (dropLat! - pickupLat!) * progress, pickupLng! + (dropLng! - pickupLng!) * progress)];
+          if (_roadRoutePoints.isNotEmpty) {
+            final totalPoints = _roadRoutePoints.length;
+            final count = (totalPoints * progress).clamp(1, totalPoints).toInt();
+            polylinePoints = _roadRoutePoints.take(count).toList();
+          } else {
+            polylinePoints = [LatLng(pickupLat!, pickupLng!), LatLng(pickupLat! + (dropLat! - pickupLat!) * progress, pickupLng! + (dropLng! - pickupLng!) * progress)];
+          }
         }
         return FlutterMap(
           mapController: _mapController,
