@@ -324,6 +324,11 @@ exports.requestRide = async (req, res) => {
       driverId: { $ne: null }
     });
     const busyDriverIds = busyRides.map(r => r.driverId.toString());
+    console.log("DEBUG MATCHING:", {
+      busyDriverIds,
+      allDriversCount: await User.countDocuments({ role: "driver" }),
+      onlineDrivers: await User.find({ role: "driver", isAvailable: true }).lean()
+    });
 
     const availableDrivers = await User.find({
       role: "driver",
