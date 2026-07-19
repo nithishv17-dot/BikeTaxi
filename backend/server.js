@@ -71,8 +71,9 @@ io.on("connection", (socket) => {
 setInterval(async () => {
   try {
     await rideController.expireOpenNegotiations(io);
+    await rideController.expireRequestedRides(io);
   } catch (error) {
-    console.log("NEGOTIATION SWEEP ERROR:", error.message);
+    console.log("SWEEP ERROR:", error.message);
   }
 }, 10000);
 

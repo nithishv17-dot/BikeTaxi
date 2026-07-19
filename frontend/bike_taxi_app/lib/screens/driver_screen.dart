@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../ui/pro_widgets.dart';
 
 import '../services/api_service.dart';
 import '../services/location_service.dart';
@@ -36,6 +39,7 @@ class _DriverScreenState extends State<DriverScreen> {
   List<Map<String, dynamic>> directRequests = [];
   List<Map<String, dynamic>> negotiationRides = [];
   Timer? _locationTimer;
+  Timer? _refreshTimer;
 
   void _startLocationUpdates() {
     _locationTimer?.cancel();
@@ -52,6 +56,20 @@ class _DriverScreenState extends State<DriverScreen> {
   void _stopLocationUpdates() {
     _locationTimer?.cancel();
     _locationTimer = null;
+  }
+
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (mounted && isAvailable) {
+        _loadDriverStatus(silent: true);
+      }
+    });
+  }
+
+  void _stopRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
   }
 
   Future<void> _updateLocation() async {
@@ -199,18 +217,27 @@ class _DriverScreenState extends State<DriverScreen> {
       driverName = session["name"] ?? "";
       driverPhone = session["phone"] ?? "";
     }
-    _loadDriverStatus();
-    SocketService.listenRideRequested((_) => _loadDriverStatus());
-    SocketService.listenRideAccepted((_) => _loadDriverStatus());
-    SocketService.listenRideStarted((_) => _loadDriverStatus());
-    SocketService.listenRideCompleted((_) => _loadDriverStatus());
-    SocketService.listenRideCancelled((_) => _loadDriverStatus());
-    SocketService.listenNegotiationClosed((_) => _loadDriverStatus());
-    SocketService.listenNegotiationRideRequested((_) => _loadDriverStatus());
+    _loadDriverStatus().then((_) {
+      if (isAvailable) {
+        _startRefreshTimer();
+      }
+    });
+    SocketService.listenRideRequested((_) => _loadDriverStatus(silent: true));
+    SocketService.listenRideAccepted((_) => _loadDriverStatus(silent: true));
+    SocketService.listenRideStarted((_) => _loadDriverStatus(silent: true));
+    SocketService.listenRideCompleted((_) => _loadDriverStatus(silent: true));
+    SocketService.listenRideCancelled((_) => _loadDriverStatus(silent: true));
+    SocketService.listenNegotiationClosed((_) => _loadDriverStatus(silent: true));
+    SocketService.listenNegotiationRideRequested((_) => _loadDriverStatus(silent: true));
     SocketService.listenNegotiationOfferAcceptedByUser((data) => _handleDriverAssignedSocket(data));
   }
 
-  Future<void> _loadDriverStatus() async {
+  Future<void> _loadDriverStatus({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        isLoading = true;
+      });
+    }
     try {
       final response = await ApiService.getDrivers();
       final drivers = List<Map<String, dynamic>>.from(
@@ -245,22 +272,32 @@ class _DriverScreenState extends State<DriverScreen> {
         driverPhone = driver["phone"] ?? driverPhone;
         directRequests = fetchedRequests;
         negotiationRides = fetchedNegotiations;
-        isLoading = false;
-        message = "Driver status loaded";
+        if (!silent) {
+          isLoading = false;
+          message = "Driver status loaded";
+        }
       });
       _startLocationUpdates();
+      if (isAvailable) {
+        _startRefreshTimer();
+      } else {
+        _stopRefreshTimer();
+      }
     } catch (e) {
       if (!mounted) return;
 
-      setState(() {
-        isLoading = false;
-        message = e.toString().replaceFirst("Exception: ", "");
-      });
+      if (!silent) {
+        setState(() {
+          isLoading = false;
+          message = e.toString().replaceFirst("Exception: ", "");
+        });
+      }
     }
   }
 
   @override
   void dispose() {
+    _stopRefreshTimer();
     _stopLocationUpdates();
     SocketService.removeAllRideListeners();
     rideIdController.dispose();
@@ -323,9 +360,16 @@ class _DriverScreenState extends State<DriverScreen> {
   }
 
   Future<void> toggleDriver() async {
+    final originalState = isAvailable;
+
+    HapticFeedback.lightImpact();
+
     setState(() {
+      isAvailable = !isAvailable;
+      message = isAvailable
+          ? "You are now online and visible to riders."
+          : "You are now offline and not accepting rides.";
       isLoading = true;
-      message = "Updating availability...";
     });
 
     try {
@@ -333,38 +377,38 @@ class _DriverScreenState extends State<DriverScreen> {
 
       if (!mounted) return;
 
-      final nextStatus = response["isAvailable"] ?? !isAvailable;
+      final nextStatus = response["isAvailable"] ?? isAvailable;
 
       setState(() {
         isAvailable = nextStatus;
-        message = nextStatus
-            ? "You are now online and visible to riders."
-            : "You are now offline and not accepting rides.";
+        isLoading = false;
       });
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ).showSnackBar(SnackBar(
+        content: Text(isAvailable
+            ? "You are now online and visible to riders."
+            : "You are now offline and not accepting rides."),
+        behavior: SnackBarBehavior.floating,
+      ));
 
-      await _loadDriverStatus();
+      await _loadDriverStatus(silent: true);
     } catch (e) {
       if (!mounted) return;
 
-      final errorMessage = e.toString().replaceFirst("Exception: ", "");
-
       setState(() {
-        message = errorMessage;
+        isAvailable = originalState;
+        isLoading = false;
+        message = e.toString().replaceFirst("Exception: ", "");
       });
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(errorMessage)));
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      ).showSnackBar(SnackBar(
+        content: Text("Failed to update status: $message"),
+        behavior: SnackBarBehavior.floating,
+      ));
     }
   }
 
@@ -1047,36 +1091,28 @@ class _DriverScreenState extends State<DriverScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.35),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withOpacity(0.08)),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          "Duty Status",
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CaptainDutyToggle(
+                        value: isAvailable,
+                        loading: isLoading,
+                        onChanged: (_) => toggleDriver(),
+                      ),
+                      const SizedBox(height: 6),
+                      AnimatedOpacity(
+                        duration: const Duration(milliseconds: 300),
+                        opacity: isAvailable ? 1.0 : 0.6,
+                        child: Text(
+                          isAvailable ? "You're Online" : "You're Offline",
                           style: TextStyle(
-                            color: Colors.white70,
+                            color: isAvailable ? const Color(0xFF34D399) : Colors.white60,
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Transform.scale(
-                          scale: 0.85,
-                          child: Switch(
-                            value: isAvailable,
-                            onChanged: isLoading ? null : (_) => toggleDriver(),
-                            activeTrackColor: AppPalette.secondary,
-                            activeColor: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
               ),

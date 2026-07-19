@@ -306,7 +306,10 @@ exports.requestRide = async (req, res) => {
       ...ridePayload,
       driverId: driver?._id || null,
       status: "requested",
-      negotiationStatus: "none"
+      negotiationStatus: "none",
+      negotiationExpiresAt: new Date(
+        Date.now() + getNegotiationTimeoutSeconds() * 1000
+      )
     });
 
     await ride.save();
@@ -906,6 +909,32 @@ exports.expireOpenNegotiations = async (io) => {
   });
 
   await Promise.all(rides.map((ride) => expireNegotiationIfNeeded(ride, io)));
+};
+
+exports.expireRequestedRides = async (io) => {
+  const expiredRides = await Ride.find({
+    bookingMode: "normal",
+    status: "requested",
+    negotiationExpiresAt: { $lte: new Date() }
+  });
+
+  for (const ride of expiredRides) {
+    ride.status = "cancelled";
+    await ride.save();
+
+    if (ride.driverId) {
+      const driver = await User.findById(ride.driverId);
+      if (driver) {
+        driver.isAvailable = true;
+        await driver.save();
+      }
+    }
+
+    const refreshedRide = await getPopulatedRide(ride._id);
+    if (refreshedRide && io) {
+      io.emit("rideCancelled", refreshedRide);
+    }
+  }
 };
 
 exports.getActiveRide = async (req, res) => {
