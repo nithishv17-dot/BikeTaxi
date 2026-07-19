@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:go_router/go_router.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
 import '../services/socket_service.dart';
@@ -145,6 +147,12 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     _startDriversPolling();
     _loadCurrentLocation();
 
+    _loadFromPrefs().then((_) {
+      pickupController.addListener(_saveToPrefs);
+      destinationController.addListener(_saveToPrefs);
+      _offerController.addListener(_saveToPrefs);
+    });
+
     SocketService.listenDriverLocationUpdated((data) {
       if (!mounted) return;
       final driverId = data["driverId"]?.toString();
@@ -162,6 +170,78 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         });
       }
     });
+  }
+
+  void _saveToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('pickup_text', pickupController.text);
+      await prefs.setString('pickup_address', pickupAddress ?? '');
+      await prefs.setString('pickup_placeId', pickupPlaceId ?? '');
+      await prefs.setDouble('pickup_lat', pickupLat ?? 0.0);
+      await prefs.setDouble('pickup_lng', pickupLng ?? 0.0);
+
+      await prefs.setString('destination_text', destinationController.text);
+      await prefs.setString('destination_address', dropAddress ?? '');
+      await prefs.setString('destination_placeId', dropPlaceId ?? '');
+      await prefs.setDouble('destination_lat', dropLat ?? 0.0);
+      await prefs.setDouble('destination_lng', dropLng ?? 0.0);
+
+      await prefs.setString('offer_fare', _offerController.text);
+    } catch (_) {}
+  }
+
+  Future<void> _loadFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pText = prefs.getString('pickup_text') ?? '';
+      final pAddr = prefs.getString('pickup_address') ?? '';
+      final pPid = prefs.getString('pickup_placeId') ?? '';
+      final pLat = prefs.getDouble('pickup_lat') ?? 0.0;
+      final pLng = prefs.getDouble('pickup_lng') ?? 0.0;
+
+      final dText = prefs.getString('destination_text') ?? '';
+      final dAddr = prefs.getString('destination_address') ?? '';
+      final dPid = prefs.getString('destination_placeId') ?? '';
+      final dLat = prefs.getDouble('destination_lat') ?? 0.0;
+      final dLng = prefs.getDouble('destination_lng') ?? 0.0;
+
+      final oFare = prefs.getString('offer_fare') ?? '';
+
+      if (!mounted) return;
+
+      setState(() {
+        if (pText.isNotEmpty) {
+          pickupController.text = pText;
+          pickupInput = pText;
+          pickupAddress = pAddr.isNotEmpty ? pAddr : null;
+          pickupPlaceId = pPid.isNotEmpty ? pPid : null;
+          if (pLat != 0.0) pickupLat = pLat;
+          if (pLng != 0.0) pickupLng = pLng;
+        }
+
+        if (dText.isNotEmpty) {
+          destinationController.text = dText;
+          dropInput = dText;
+          dropAddress = dAddr.isNotEmpty ? dAddr : null;
+          dropPlaceId = dPid.isNotEmpty ? dPid : null;
+          if (dLat != 0.0) dropLat = dLat;
+          if (dLng != 0.0) dropLng = dLng;
+        }
+
+        if (oFare.isNotEmpty) {
+          _offerController.text = oFare;
+        }
+      });
+
+      if (pickupLat != null && dropLat != null && !_hasSamePickupAndDrop && _phase == _BookingPhase.initial) {
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted && pickupLat != null && dropLat != null) {
+            _startRouteSequence();
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -492,6 +572,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     if (!isPickup && _phase == _BookingPhase.initial && pickupLat != null && dropLat != null && !_hasSamePickupAndDrop) {
       _startRouteSequence();
     }
+    _saveToPrefs();
   }
 
   void _onMapTapped(LatLng point) {
@@ -552,6 +633,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     if (pickupLat != null && dropLat != null && _phase == _BookingPhase.initial && !_hasSamePickupAndDrop) {
       _startRouteSequence();
     }
+    _saveToPrefs();
   }
 
   Future<void> _selectCurrentPickupAddress(Map<String, double> pos) async {
@@ -587,7 +669,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       );
       if (!mounted) return;
       if (response["ride"] != null && response["ride"]["_id"] != null) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => RideStatusScreen(rideId: response["ride"]["_id"])));
+        context.go('/ride-status/${response["ride"]["_id"]}');
       }
     } catch (e) {
       if (!mounted) return;

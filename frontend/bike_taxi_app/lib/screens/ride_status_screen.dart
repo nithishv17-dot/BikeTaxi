@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:go_router/go_router.dart';
 
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
@@ -12,6 +13,8 @@ import '../theme/premium_ui.dart';
 import '../utils/location_display.dart';
 import 'driver_screen.dart';
 import 'home_screen.dart';
+
+enum RideMode { negotiation, normal }
 
 class RideStatusScreen extends StatefulWidget {
   final String rideId;
@@ -38,6 +41,29 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   int negotiationSecondsRemaining = 0;
   String? overridePaymentMethod;
   bool _isDetailsExpanded = false;
+
+  bool normalModeTimeout = false;
+  Timer? _normalTimeoutTimer;
+
+  RideMode get rideMode => isNegotiationRide ? RideMode.negotiation : RideMode.normal;
+
+  void _startNormalTimeoutTimer() {
+    _cancelNormalTimeoutTimer();
+    if (isNormalWaiting) {
+      _normalTimeoutTimer = Timer(const Duration(seconds: 75), () {
+        if (mounted && isNormalWaiting) {
+          setState(() {
+            normalModeTimeout = true;
+          });
+        }
+      });
+    }
+  }
+
+  void _cancelNormalTimeoutTimer() {
+    _normalTimeoutTimer?.cancel();
+    _normalTimeoutTimer = null;
+  }
 
   String _formatFareToInt(dynamic rawFare) {
     if (rawFare == null) return "N/A";
@@ -75,6 +101,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
 
   @override
   void dispose() {
+    _cancelNormalTimeoutTimer();
     countdownTimer?.cancel();
     SocketService.removeAllRideListeners();
     SocketService.stopListeningDriverLocationUpdated();
@@ -87,7 +114,16 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     negotiationSecondsRemaining = 0;
 
     if (!isWaiting) {
+      _cancelNormalTimeoutTimer();
       return;
+    }
+
+    if (isNormalWaiting) {
+      if (_normalTimeoutTimer == null && !normalModeTimeout) {
+        _startNormalTimeoutTimer();
+      }
+    } else {
+      _cancelNormalTimeoutTimer();
     }
 
     final expiresAtRaw = ride?["negotiationExpiresAt"]?.toString();
@@ -1010,12 +1046,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         return;
       }
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => RideStatusScreen(rideId: nextRideId),
-        ),
-      );
+      context.go('/ride-status/$nextRideId');
     } catch (e) {
       if (!mounted) {
         return;
@@ -1496,10 +1527,10 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  "Driver Offers",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  rideMode == RideMode.negotiation ? "Driver Offers" : "Ride Request",
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                 ),
               ),
               Container(
@@ -1521,247 +1552,319 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppPalette.primary.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppPalette.primary.withOpacity(0.22)),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppPalette.primary,
+          if (normalModeTimeout) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    size: 48,
+                    color: Colors.red.shade400,
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    negotiationSecondsRemaining > 0
-                        ? "Waiting for offers · ${_formatCountdown(negotiationSecondsRemaining)} remaining"
-                        : "Finalizing negotiation status…",
+                  const SizedBox(height: 12),
+                  const Text(
+                    "No Captains Available",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppPalette.slate900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    "Captains are busy right now. Please try again.",
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppPalette.slate500,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      backgroundColor: AppPalette.primary,
+                      foregroundColor: AppPalette.navy900,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        normalModeTimeout = false;
+                      });
+                      _startNormalTimeoutTimer();
+                      _rebookRide("normal");
+                    },
+                    child: const Text("Retry"),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            if (rideMode == RideMode.negotiation) ...[
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  LinearProgressIndicator(
+                    minHeight: 6,
+                    borderRadius: BorderRadius.circular(3),
+                    color: AppPalette.primary,
+                    backgroundColor: AppPalette.primary.withOpacity(0.12),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    "Waiting for offers - ${_formatCountdown(negotiationSecondsRemaining)} remaining",
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
                       color: AppPalette.primary,
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (!isNegotiationRide || offers.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Column(
+                ],
+              ),
+            ] else ...[
+              Row(
                 children: [
-                  Icon(
-                    Icons.hourglass_empty_rounded,
-                    size: 40,
-                    color: Colors.grey.shade400,
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppPalette.primary,
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(width: 10),
                   const Text(
-                    "Waiting for driver offers…",
+                    "Finding your captain...",
                     style: TextStyle(
-                      color: Color(0xFF64748B),
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: AppPalette.primary,
                     ),
                   ),
                 ],
               ),
-            )
-          else
-            ...offers.map((offer) {
-              final offerId = _normalizeOfferId(offer["_id"]) ?? "";
-              final driverName =
-                  offer["driverName"]?.toString() ?? "Captain";
-              final fare = _formatFareToInt(offer["offeredFare"]);
-              final rating =
-                  (offer["driverRating"] ?? offer["rating"])?.toString() ??
-                      "4.8";
-              final eta = offer["eta"]?.toString() ?? "~3 min";
-              final initials = driverName.isNotEmpty
-                  ? driverName.trim().split(" ").map((w) => w[0]).take(2).join()
-                  : "C";
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.04),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.white.withOpacity(0.09)),
-                ),
+            ],
+            const SizedBox(height: 16),
+            if (rideMode == RideMode.normal)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Column(
                   children: [
-                    Row(
-                      children: [
-                        // Driver avatar
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: AppPalette.primary.withOpacity(0.18),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: AppPalette.primary.withOpacity(0.35),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              initials.toUpperCase(),
-                              style: const TextStyle(
-                                color: AppPalette.primary,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 18,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                driverName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 15,
-                                  color: AppPalette.slate900,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.star_rounded,
-                                    color: Color(0xFFF59E0B),
-                                    size: 14,
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    rating,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13,
-                                      color: AppPalette.slate700,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  const Icon(
-                                    Icons.access_time_rounded,
-                                    color: AppPalette.slate700,
-                                    size: 13,
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    eta,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                      color: AppPalette.slate700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Fare badge
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            const Text(
-                              "Counter offer",
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppPalette.slate700,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              "₹ $fare",
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
-                                color: AppPalette.slate900,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                    Icon(
+                      Icons.hourglass_empty_rounded,
+                      size: 40,
+                      color: Colors.grey.shade400,
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        // Reject button
-                        Expanded(
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 12),
-                              foregroundColor: Colors.redAccent,
-                              side: const BorderSide(
-                                color: Colors.redAccent,
-                                width: 1,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            onPressed: actionLoading
-                                ? null
-                                : () {
-                                    setState(() {
-                                      offers.removeWhere(
-                                        (o) =>
-                                            _normalizeOfferId(o["_id"]) ==
-                                            offerId,
-                                      );
-                                    });
-                                  },
-                            child: const Text("Reject"),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Accept button
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 12),
-                              backgroundColor: AppPalette.primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 0,
-                            ),
-                            onPressed: actionLoading || offerId.isEmpty
-                                ? null
-                                : () => confirmOffer(offerId),
-                            child: const Text(
-                              "Accept Offer",
-                              style: TextStyle(fontWeight: FontWeight.w800),
-                            ),
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 10),
+                    const Text(
+                      "Finding your captain...",
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
-              );
-            }).toList(),
+              )
+            else if (offers.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.hourglass_empty_rounded,
+                      size: 40,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      "Waiting for driver offers…",
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ...offers.map((offer) {
+                final offerId = _normalizeOfferId(offer["_id"]) ?? "";
+                final driverName = offer["driverName"]?.toString() ?? "Captain";
+                final fare = _formatFareToInt(offer["offeredFare"]);
+                final rating = (offer["driverRating"] ?? offer["rating"])?.toString() ?? "4.8";
+                final eta = offer["eta"]?.toString() ?? "~3 min";
+                final initials = driverName.isNotEmpty
+                    ? driverName.trim().split(" ").map((w) => w[0]).take(2).join()
+                    : "C";
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withOpacity(0.09)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: AppPalette.primary.withOpacity(0.18),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppPalette.primary.withOpacity(0.35),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                initials.toUpperCase(),
+                                style: const TextStyle(
+                                  color: AppPalette.primary,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  driverName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                    color: AppPalette.slate900,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.star_rounded,
+                                      color: Color(0xFFF59E0B),
+                                      size: 14,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      rating,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                        color: AppPalette.slate700,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Icon(
+                                      Icons.access_time_rounded,
+                                      color: AppPalette.slate700,
+                                      size: 13,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      eta,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                        color: AppPalette.slate700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text(
+                                "Counter offer",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppPalette.slate700,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                "₹ $fare",
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppPalette.slate900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                foregroundColor: Colors.redAccent,
+                                side: const BorderSide(
+                                  color: Colors.redAccent,
+                                  width: 1,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: actionLoading
+                                  ? null
+                                  : () {
+                                      setState(() {
+                                        offers.removeWhere(
+                                          (o) => _normalizeOfferId(o["_id"]) == offerId,
+                                        );
+                                      });
+                                    },
+                              child: const Text("Reject"),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                backgroundColor: AppPalette.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              onPressed: actionLoading || offerId.isEmpty
+                                  ? null
+                                  : () => confirmOffer(offerId),
+                              child: const Text(
+                                "Accept Offer",
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+          ],
         ],
       ),
     );

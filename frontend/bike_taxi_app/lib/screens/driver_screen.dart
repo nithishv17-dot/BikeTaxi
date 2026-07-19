@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 import '../ui/pro_widgets.dart';
 
@@ -182,13 +183,7 @@ class _DriverScreenState extends State<DriverScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Ride matched! Opening status page...")),
       );
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              RideStatusScreen(rideId: rideId, isDriver: true),
-        ),
-      );
+      context.push('/ride-status/$rideId?driver=true');
     } else {
       _loadDriverStatus();
     }
@@ -331,13 +326,7 @@ class _DriverScreenState extends State<DriverScreen> {
 
       _loadDriverStatus();
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              RideStatusScreen(rideId: rideId, isDriver: true),
-        ),
-      );
+      context.push('/ride-status/$rideId?driver=true');
     } catch (e) {
       if (!mounted) return;
 
@@ -1262,12 +1251,7 @@ class _DriverScreenState extends State<DriverScreen> {
                   }
                   SessionService.clearSession();
                   if (!mounted) return;
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ),
-                  );
+                  context.go('/login');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEF4444),

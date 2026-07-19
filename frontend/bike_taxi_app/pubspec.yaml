@@ -39,6 +39,8 @@ dependencies:
   flutter_map: ^8.2.2
   latlong2: ^0.9.1
   google_fonts: ^6.3.2
+  shared_preferences: ^2.3.2
+  go_router: ^14.2.7
 dev_dependencies:
   flutter_test:
     sdk: flutter

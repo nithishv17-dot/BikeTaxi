@@ -1,13 +1,83 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/driver_screen.dart';
+import 'screens/ride_status_screen.dart';
 import 'services/api_service.dart';
 import 'services/session_service.dart';
 import 'services/socket_service.dart';
 import 'theme/premium_ui.dart';
+
+final GoRouter _router = GoRouter(
+  initialLocation: '/',
+  routes: [
+    GoRoute(
+      path: '/',
+      redirect: (context, state) {
+        final session = SessionService.loadSession();
+        if (session == null) {
+          return '/login';
+        }
+        ApiService.token = session['token'];
+        final role = session['role'] ?? 'user';
+        if (role == 'driver') {
+          return '/driver';
+        } else {
+          return '/home';
+        }
+      },
+    ),
+    GoRoute(
+      path: '/login',
+      builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
+      path: '/register',
+      builder: (context, state) => const RegisterScreen(),
+    ),
+    GoRoute(
+      path: '/home',
+      builder: (context, state) {
+        final session = SessionService.loadSession();
+        if (session == null) {
+          return const LoginScreen();
+        }
+        ApiService.token = session['token'];
+        final userId = session['userId'] ?? '';
+        return HomeScreen(userId: userId);
+      },
+    ),
+    GoRoute(
+      path: '/driver',
+      builder: (context, state) {
+        final session = SessionService.loadSession();
+        if (session == null) {
+          return const LoginScreen();
+        }
+        ApiService.token = session['token'];
+        final userId = session['userId'] ?? '';
+        return DriverScreen(driverId: userId);
+      },
+    ),
+    GoRoute(
+      path: '/ride-status/:rideId',
+      builder: (context, state) {
+        final session = SessionService.loadSession();
+        if (session == null) {
+          return const LoginScreen();
+        }
+        ApiService.token = session['token'];
+        final rideId = state.pathParameters['rideId']!;
+        final isDriver = state.uri.queryParameters['driver'] == 'true';
+        return RideStatusScreen(rideId: rideId, isDriver: isDriver);
+      },
+    ),
+  ],
+);
 
 void main() {
   SocketService.connect();
@@ -24,20 +94,9 @@ class BikeTaxiApp extends StatelessWidget {
       ThemeData(brightness: Brightness.dark).textTheme,
     );
 
-    // Check for saved session
-    final session = SessionService.loadSession();
-    Widget homeWidget;
-    if (session != null) {
-      ApiService.token = session['token'];
-      final role = session['role'] ?? 'user';
-      final userId = session['userId']!;
-      homeWidget = SessionInitPage(userId: userId, role: role);
-    } else {
-      homeWidget = const LoginScreen();
-    }
-
-    return MaterialApp(
+    return MaterialApp.router(
       debugShowCheckedModeBanner: false,
+      routerConfig: _router,
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
@@ -137,55 +196,6 @@ class BikeTaxiApp extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-        ),
-      ),
-      home: homeWidget,
-    );
-  }
-}
-
-class SessionInitPage extends StatefulWidget {
-  final String userId;
-  final String role;
-
-  const SessionInitPage({super.key, required this.userId, required this.role});
-
-  @override
-  State<SessionInitPage> createState() => _SessionInitPageState();
-}
-
-class _SessionInitPageState extends State<SessionInitPage> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _goToHome());
-  }
-
-  void _goToHome() {
-    if (!mounted) return;
-    if (widget.role == 'driver') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DriverScreen(driverId: widget.userId),
-        ),
-      );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => HomeScreen(userId: widget.userId),
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(
-          color: AppPalette.primary,
         ),
       ),
     );

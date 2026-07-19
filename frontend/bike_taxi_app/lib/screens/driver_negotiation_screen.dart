@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
@@ -50,13 +51,7 @@ class _DriverNegotiationScreenState extends State<DriverNegotiationScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Ride matched! Opening status page...")),
       );
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              RideStatusScreen(rideId: rideId, isDriver: true),
-        ),
-      );
+      context.push('/ride-status/$rideId?driver=true');
     } else {
       fetchNegotiationRides();
     }
