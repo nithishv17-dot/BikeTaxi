@@ -319,11 +319,11 @@ exports.requestRide = async (req, res) => {
       }
     }
 
-    const activeRides = await Ride.find({
+    const busyRides = await Ride.find({
       status: { $in: ["requested", "accepted", "started", "negotiating"] },
       driverId: { $ne: null }
     });
-    const busyDriverIds = activeRides.map(r => r.driverId.toString());
+    const busyDriverIds = busyRides.map(r => r.driverId.toString());
 
     const availableDrivers = await User.find({
       role: "driver",
