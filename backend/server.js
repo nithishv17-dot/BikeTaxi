@@ -51,7 +51,7 @@ app.get("/api/cleanup-rides", async (req, res) => {
     );
     await User.updateMany(
       { role: "driver" },
-      { $set: { isAvailable: true } }
+      { $set: { isAvailable: false } }
     );
     res.json({
       message: "Database cleanup completed successfully.",
