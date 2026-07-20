@@ -191,10 +191,12 @@ class ApiService {
           final coordinates = geometry["coordinates"] is List
               ? List<dynamic>.from(geometry["coordinates"] as List)
               : const <dynamic>[];
-          final lng = coordinates.isNotEmpty
+          // GeoJSON standard dictates that the first coordinate is Longitude (index 0)
+          // and the second coordinate is Latitude (index 1)
+          final double? lng = coordinates.isNotEmpty
               ? (coordinates[0] as num?)?.toDouble()
               : null;
-          final lat = coordinates.length > 1
+          final double? lat = coordinates.length > 1
               ? (coordinates[1] as num?)?.toDouble()
               : null;
           final addressParts = <String>[

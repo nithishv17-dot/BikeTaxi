@@ -15,36 +15,6 @@ class RouteResult {
 }
 
 class RoutingService {
-  static List<LatLng> decodePolyline(String encoded) {
-    List<LatLng> points = [];
-    int index = 0, len = encoded.length;
-    int lat = 0, lng = 0;
-
-    while (index < len) {
-      int b, shift = 0, result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lng += dlng;
-
-      points.add(LatLng(lat / 1E5, lng / 1E5));
-    }
-    return points;
-  }
-
   static Future<RouteResult?> getRoute(
     double startLat,
     double startLng,
@@ -52,10 +22,11 @@ class RoutingService {
     double endLng,
   ) async {
     try {
+      // OSRM HTTP request strictly formats coordinates in URL as {pickupLng},{pickupLat};{dropLng},{dropLat}
       final url = Uri.parse(
         "https://router.project-osrm.org/route/v1/driving/"
         "$startLng,$startLat;$endLng,$endLat"
-        "?overview=full&geometries=polyline",
+        "?overview=full&geometries=geojson",
       );
 
       final response = await http.get(url);
@@ -63,8 +34,15 @@ class RoutingService {
         final data = jsonDecode(response.body);
         if (data["routes"] != null && (data["routes"] as List).isNotEmpty) {
           final route = data["routes"][0];
-          final geometry = route["geometry"] as String;
-          final points = decodePolyline(geometry);
+          final geometry = route["geometry"] as Map<String, dynamic>;
+          final coordinates = geometry["coordinates"] as List<dynamic>;
+
+          // Decodes the GeoJSON coordinates and flips [Lng, Lat] to Flutter's [Lat, Lng] (LatLng) format
+          final List<LatLng> points = coordinates.map((coord) {
+            final double lng = (coord[0] as num).toDouble();
+            final double lat = (coord[1] as num).toDouble();
+            return LatLng(lat, lng);
+          }).toList();
 
           final double distanceMeters = (route["distance"] as num).toDouble();
           final double durationSeconds = (route["duration"] as num).toDouble();
