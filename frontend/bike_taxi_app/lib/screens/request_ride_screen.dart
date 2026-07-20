@@ -454,19 +454,20 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       return;
     }
 
-    final points = _roadRoutePoints.where((p) => p.latitude != 0.0 && p.longitude != 0.0).toList();
-    final List<LatLng> allPoints = points.isNotEmpty
-        ? points
-        : [LatLng(pickupLat!, pickupLng!), LatLng(dropLat!, dropLng!)];
+    // Frame camera strictly using Pickup & Drop endpoints to prevent road detours from inflating zoom bounds
+    final List<LatLng> framingPoints = [
+      LatLng(pickupLat!, pickupLng!),
+      LatLng(dropLat!, dropLng!),
+    ];
 
     try {
-      final bounds = LatLngBounds.fromPoints(allPoints);
+      final bounds = LatLngBounds.fromPoints(framingPoints);
       final mediaQuery = MediaQuery.maybeOf(context);
       final screenHeight = mediaQuery?.size.height ?? 800.0;
 
       final bottomPadding = (_phase == _BookingPhase.routeReady)
-          ? screenHeight * 0.52
-          : screenHeight * 0.30;
+          ? screenHeight * 0.50
+          : screenHeight * 0.28;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _isMapReady) {
@@ -474,13 +475,13 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
             CameraFit.bounds(
               bounds: bounds,
               padding: EdgeInsets.only(
-                top: 100.0,
+                top: 90.0,
                 bottom: bottomPadding,
-                left: 50.0,
-                right: 50.0,
+                left: 48.0,
+                right: 48.0,
               ),
               maxZoom: 16.5,
-              minZoom: 14.5,
+              minZoom: 14.2,
             ),
           );
         }
