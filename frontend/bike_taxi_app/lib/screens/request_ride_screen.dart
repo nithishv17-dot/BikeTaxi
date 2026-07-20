@@ -458,7 +458,14 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
             LatLng(dropLat!, dropLng!),
           ]);
     try {
-      _mapController.fitCamera(CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.fromLTRB(70, 130, 70, 330)));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _mapController.fitCamera(CameraFit.bounds(
+            bounds: bounds,
+            padding: const EdgeInsets.fromLTRB(40, 100, 40, 160),
+          ));
+        }
+      });
     } catch (_) {}
   }
 
@@ -847,10 +854,17 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         }
         return FlutterMap(
           mapController: _mapController,
-          options: MapOptions(initialCenter: initialCenter, initialZoom: 13.5, onTap: (_, point) => _onMapTapped(point)),
+          options: MapOptions(
+            initialCenter: initialCenter,
+            initialZoom: 13.5,
+            onTap: (_, point) => _onMapTapped(point),
+            onMapReady: () {
+              _fitMapToRoute();
+            },
+          ),
           children: [
             TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", userAgentPackageName: "com.example.bike_taxi_app"),
-            if (polylinePoints.length == 2)
+            if (polylinePoints.length >= 2)
               PolylineLayer(polylines: [Polyline(points: polylinePoints, color: const Color(0xFFF4A261), strokeWidth: 5.0, borderColor: Colors.white.withOpacity(0.4), borderStrokeWidth: 2.0)]),
             MarkerLayer(markers: [
               ...driverMarkers,
