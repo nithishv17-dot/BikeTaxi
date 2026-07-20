@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
@@ -95,110 +96,174 @@ class BikeTaxiApp extends StatelessWidget {
       ThemeData(brightness: Brightness.dark).textTheme,
     );
 
-    return MaterialApp.router(
-      debugShowCheckedModeBanner: false,
-      routerConfig: _router,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: seedColor,
+    return InactivityWrapper(
+      child: MaterialApp.router(
+        debugShowCheckedModeBanner: false,
+        routerConfig: _router,
+        theme: ThemeData(
+          useMaterial3: true,
           brightness: Brightness.dark,
-        ),
-        scaffoldBackgroundColor: AppPalette.background,
-        textTheme: baseTextTheme.apply(
-          bodyColor: AppPalette.slate900,
-          displayColor: AppPalette.slate900,
-        ),
-        pageTransitionsTheme: const PageTransitionsTheme(
-          builders: {
-            TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
-            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-            TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
-            TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
-            TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
-            TargetPlatform.fuchsia: FadeUpwardsPageTransitionsBuilder(),
-          },
-        ),
-        appBarTheme: const AppBarTheme(
-          centerTitle: false,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          backgroundColor: Colors.transparent,
-          foregroundColor: AppPalette.slate900,
-          titleTextStyle: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            color: AppPalette.slate900,
-            letterSpacing: -0.4,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: seedColor,
+            brightness: Brightness.dark,
           ),
-        ),
-        cardTheme: CardThemeData(
-          elevation: 2,
-          color: Colors.white.withOpacity(0.06),
-          shadowColor: Colors.black.withOpacity(0.4),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(26),
+          scaffoldBackgroundColor: AppPalette.background,
+          textTheme: baseTextTheme.apply(
+            bodyColor: AppPalette.slate900,
+            displayColor: AppPalette.slate900,
           ),
-          margin: EdgeInsets.zero,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white.withOpacity(0.05),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 18,
-            vertical: 18,
+          pageTransitionsTheme: const PageTransitionsTheme(
+            builders: {
+              TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+              TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.fuchsia: FadeUpwardsPageTransitionsBuilder(),
+            },
           ),
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: AppPalette.slate700,
-          ),
-          hintStyle: const TextStyle(
-            fontWeight: FontWeight.w500,
-            color: AppPalette.slate700,
-          ),
-          prefixIconColor: AppPalette.slate700,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(color: seedColor, width: 1.8),
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            elevation: 1,
-            backgroundColor: seedColor,
-            foregroundColor: AppPalette.navy900,
-            minimumSize: const Size(double.infinity, 56),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            textStyle: const TextStyle(
-              fontSize: 16,
+          appBarTheme: const AppBarTheme(
+            centerTitle: false,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            backgroundColor: Colors.transparent,
+            foregroundColor: AppPalette.slate900,
+            titleTextStyle: TextStyle(
+              fontSize: 24,
               fontWeight: FontWeight.w800,
-              letterSpacing: 0.3,
+              color: AppPalette.slate900,
+              letterSpacing: -0.4,
             ),
           ),
-        ),
-        snackBarTheme: SnackBarThemeData(
-          backgroundColor: AppPalette.background,
-          contentTextStyle: baseTextTheme.bodyMedium?.copyWith(
-            color: AppPalette.slate900,
-            fontWeight: FontWeight.w600,
+          cardTheme: CardThemeData(
+            elevation: 2,
+            color: Colors.white.withOpacity(0.06),
+            shadowColor: Colors.black.withOpacity(0.4),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(26),
+            ),
+            margin: EdgeInsets.zero,
           ),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.05),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 18,
+            ),
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              color: AppPalette.slate700,
+            ),
+            hintStyle: const TextStyle(
+              fontWeight: FontWeight.w500,
+              color: AppPalette.slate700,
+            ),
+            prefixIconColor: AppPalette.slate700,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: const BorderSide(color: seedColor, width: 1.8),
+            ),
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              elevation: 1,
+              backgroundColor: seedColor,
+              foregroundColor: AppPalette.navy900,
+              minimumSize: const Size(double.infinity, 56),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+          snackBarTheme: SnackBarThemeData(
+            backgroundColor: AppPalette.background,
+            contentTextStyle: baseTextTheme.bodyMedium?.copyWith(
+              color: AppPalette.slate900,
+              fontWeight: FontWeight.w600,
+            ),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class InactivityWrapper extends StatefulWidget {
+  final Widget child;
+
+  const InactivityWrapper({super.key, required this.child});
+
+  @override
+  State<InactivityWrapper> createState() => _InactivityWrapperState();
+}
+
+class _InactivityWrapperState extends State<InactivityWrapper> {
+  Timer? _inactivityTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _resetTimer();
+  }
+
+  @override
+  void dispose() {
+    _inactivityTimer?.cancel();
+    super.dispose();
+  }
+
+  void _resetTimer() {
+    _inactivityTimer?.cancel();
+    final session = SessionService.loadSession();
+    if (session != null) {
+      SessionService.updateLastActive();
+      _inactivityTimer = Timer(SessionService.inactivityTimeout, _handleAutoLogout);
+    }
+  }
+
+  void _handleAutoLogout() {
+    final session = SessionService.loadSession();
+    if (session != null) {
+      SessionService.clearSession();
+      _router.go('/login');
+      final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+      if (scaffoldMessenger != null) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text("Session expired due to inactivity. Please log in again."),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _resetTimer(),
+      onPointerMove: (_) => _resetTimer(),
+      onPointerUp: (_) => _resetTimer(),
+      child: widget.child,
     );
   }
 }
