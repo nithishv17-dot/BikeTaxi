@@ -410,30 +410,20 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
   Future<void> _startRouteSequence() async {
     if (!mounted) return;
-    setState(() => _phase = _BookingPhase.calculating);
-    
+
     await _fetchRoadRoute();
-    
+
     if (!mounted) return;
 
-    _routeAnimCtrl.reset();
-    _routeAnimCtrl.forward();
-    _fitMapToRoute();
-
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-    _glassAnimCtrl.reset();
-    _glassAnimCtrl.forward();
-
-    await Future<void>.delayed(const Duration(milliseconds: 350));
-    if (!mounted) return;
     setState(() {
       _phase = _BookingPhase.routeReady;
       _sheetAutoExpanded = true;
     });
 
+    _fitMapToRoute();
+
     if (_sheetCtrl.isAttached) {
-      _sheetCtrl.animateTo(0.60, duration: const Duration(milliseconds: 420), curve: Curves.easeOutBack);
+      _sheetCtrl.animateTo(0.60, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
     }
     _contentAnimCtrl.reset();
     _contentAnimCtrl.forward();
@@ -883,57 +873,39 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       );
     }).where((m) => m.point.latitude != 0.0).toList();
 
-    return AnimatedBuilder(
-      animation: _routeAnimCtrl,
-      builder: (context, _) {
-        final progress = _polylineProgress.value;
-        final markerOp = _markerOpacity.value;
-        List<LatLng> polylinePoints = [];
-        if (pickupLat != null && dropLat != null && progress > 0) {
-          if (_roadRoutePoints.isNotEmpty) {
-            final totalPoints = _roadRoutePoints.length;
-            final count = (totalPoints * progress).clamp(1, totalPoints).toInt();
-            polylinePoints = _roadRoutePoints.take(count).toList();
-          } else {
-            polylinePoints = [LatLng(pickupLat!, pickupLng!), LatLng(pickupLat! + (dropLat! - pickupLat!) * progress, pickupLng! + (dropLng! - pickupLng!) * progress)];
-          }
-        }
-        return FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCenter: initialCenter,
-            initialZoom: 13.5,
-            minZoom: 11.0, 
-            maxZoom: 18.0,
-            onTap: (_, point) => _onMapTapped(point),
-            onMapReady: () {
-              setState(() {
-                _isMapReady = true;
-              });
-              _fitMapToRoute();
-            },
-            // --- ADD THIS BLOCK TO LOG THE ZOOM LEVEL ---
-            onPositionChanged: (MapPosition position, bool hasGesture) {
-              print('====================================');
-              print('CURRENT MAP ZOOM LEVEL: ${position.zoom}');
-              print('CURRENT MAP CENTER: LAT ${position.center.latitude}, LNG ${position.center.longitude}');
-              print('====================================');
-            },
-            // --------------------------------------------
-          ),
-          children: [
-            TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", userAgentPackageName: "com.example.bike_taxi_app"),
-            if (polylinePoints.length >= 2)
-              PolylineLayer(polylines: [Polyline(points: polylinePoints, color: const Color(0xFFF4A261), strokeWidth: 5.0, borderColor: Colors.white.withOpacity(0.4), borderStrokeWidth: 2.0)]),
-            MarkerLayer(markers: [
-              ...driverMarkers,
-              if (currentLat != null && currentLng != null && currentLat != 0.0 && currentLng != 0.0 && pickupLat == null) Marker(point: LatLng(currentLat!, currentLng!), width: 48, height: 48, child: const Icon(Icons.my_location_rounded, size: 36, color: Color(0xFF16A34A))),
-              if (pickupLat != null && markerOp > 0) Marker(point: LatLng(pickupLat!, pickupLng!), width: 48, height: 48, child: Opacity(opacity: _phase == _BookingPhase.initial ? 1.0 : markerOp, child: const Icon(Icons.my_location_rounded, size: 36, color: Color(0xFF16A34A)))),
-              if (dropLat != null && markerOp > 0) Marker(point: LatLng(dropLat!, dropLng!), width: 48, height: 48, child: Opacity(opacity: _phase == _BookingPhase.initial ? 1.0 : markerOp, child: const Icon(Icons.flag_rounded, size: 36, color: Color(0xFFDC2626)))),
-            ]),
-          ],
-        );
-      },
+    List<LatLng> polylinePoints = [];
+    if (pickupLat != null && dropLat != null && pickupLat != 0.0 && dropLat != 0.0 && pickupLng != 0.0 && dropLng != 0.0) {
+      polylinePoints = _roadRoutePoints.isNotEmpty
+          ? _roadRoutePoints
+          : [LatLng(pickupLat!, pickupLng!), LatLng(dropLat!, dropLng!)];
+    }
+
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: initialCenter,
+        initialZoom: 13.5,
+        minZoom: 11.0, 
+        maxZoom: 18.0,
+        onTap: (_, point) => _onMapTapped(point),
+        onMapReady: () {
+          setState(() {
+            _isMapReady = true;
+          });
+          _fitMapToRoute();
+        },
+      ),
+      children: [
+        TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", userAgentPackageName: "com.example.bike_taxi_app"),
+        if (polylinePoints.length >= 2)
+          PolylineLayer(polylines: [Polyline(points: polylinePoints, color: const Color(0xFFF4A261), strokeWidth: 5.0, borderColor: Colors.white.withOpacity(0.4), borderStrokeWidth: 2.0)]),
+        MarkerLayer(markers: [
+          ...driverMarkers,
+          if (currentLat != null && currentLng != null && currentLat != 0.0 && currentLng != 0.0 && pickupLat == null) Marker(point: LatLng(currentLat!, currentLng!), width: 48, height: 48, child: const Icon(Icons.my_location_rounded, size: 36, color: Color(0xFF16A34A))),
+          if (pickupLat != null && pickupLat != 0.0) Marker(point: LatLng(pickupLat!, pickupLng!), width: 48, height: 48, child: const Icon(Icons.my_location_rounded, size: 36, color: Color(0xFF16A34A))),
+          if (dropLat != null && dropLat != 0.0) Marker(point: LatLng(dropLat!, dropLng!), width: 48, height: 48, child: const Icon(Icons.flag_rounded, size: 36, color: Color(0xFFDC2626))),
+        ]),
+      ],
     );
   }
 
