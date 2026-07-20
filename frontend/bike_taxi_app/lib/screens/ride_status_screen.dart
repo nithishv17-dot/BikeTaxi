@@ -1997,7 +1997,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         : MapOptions(
             initialCameraFit: CameraFit.bounds(
               bounds: bounds,
-              padding: const EdgeInsets.all(70),
+              padding: const EdgeInsets.all(32),
               maxZoom: 16.0,
             ),
           );

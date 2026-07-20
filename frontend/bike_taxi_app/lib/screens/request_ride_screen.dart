@@ -74,6 +74,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
   // ── Map ───────────────────────────────────────────────────────────────────
   final MapController _mapController = MapController();
+  bool _isMapReady = false;
 
   // ── Booking Phase & Animations ─────────────────────────────────────────────
   _BookingPhase _phase = _BookingPhase.initial;
@@ -451,9 +452,12 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   }
 
   void _fitMapToRoute() {
+    if (!_isMapReady) return;
     if (pickupLat == null || dropLat == null || pickupLat == 0.0 || dropLat == 0.0 || pickupLng == 0.0 || dropLng == 0.0) {
-      final activeLat = pickupLat ?? dropLat ?? currentLat ?? 11.0168;
-      final activeLng = pickupLng ?? dropLng ?? currentLng ?? 76.9558;
+      final safeCurrentLat = (currentLat != null && currentLat != 0.0) ? currentLat : null;
+      final safeCurrentLng = (currentLng != null && currentLng != 0.0) ? currentLng : null;
+      final activeLat = pickupLat ?? dropLat ?? safeCurrentLat ?? 11.0168;
+      final activeLng = pickupLng ?? dropLng ?? safeCurrentLng ?? 76.9558;
       try {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -475,7 +479,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         if (mounted) {
           _mapController.fitCamera(CameraFit.bounds(
             bounds: bounds,
-            padding: const EdgeInsets.fromLTRB(40, 100, 40, 160),
+            padding: const EdgeInsets.all(32),
             maxZoom: 16.0,
           ));
         }
@@ -834,7 +838,9 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   }
 
   Widget _buildFullScreenMap() {
-    final initialCenter = currentLat != null && currentLng != null ? LatLng(currentLat!, currentLng!) : const LatLng(11.0168, 76.9558);
+    final initialCenter = (currentLat != null && currentLng != null && currentLat != 0.0 && currentLng != 0.0)
+        ? LatLng(currentLat!, currentLng!)
+        : const LatLng(11.0168, 76.9558);
     final driverMarkers = availableDrivers.map((driver) {
       final loc = driver["location"];
       final double? lat = loc != null && loc["lat"] is num ? (loc["lat"] as num).toDouble() : double.tryParse("${loc?["lat"]}");
@@ -873,6 +879,9 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
             initialZoom: 13.5,
             onTap: (_, point) => _onMapTapped(point),
             onMapReady: () {
+              setState(() {
+                _isMapReady = true;
+              });
               _fitMapToRoute();
             },
           ),
@@ -882,7 +891,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
               PolylineLayer(polylines: [Polyline(points: polylinePoints, color: const Color(0xFFF4A261), strokeWidth: 5.0, borderColor: Colors.white.withOpacity(0.4), borderStrokeWidth: 2.0)]),
             MarkerLayer(markers: [
               ...driverMarkers,
-              if (currentLat != null && currentLng != null && pickupLat == null) Marker(point: LatLng(currentLat!, currentLng!), width: 48, height: 48, child: const Icon(Icons.my_location_rounded, size: 36, color: Color(0xFF16A34A))),
+              if (currentLat != null && currentLng != null && currentLat != 0.0 && currentLng != 0.0 && pickupLat == null) Marker(point: LatLng(currentLat!, currentLng!), width: 48, height: 48, child: const Icon(Icons.my_location_rounded, size: 36, color: Color(0xFF16A34A))),
               if (pickupLat != null && markerOp > 0) Marker(point: LatLng(pickupLat!, pickupLng!), width: 48, height: 48, child: Opacity(opacity: _phase == _BookingPhase.initial ? 1.0 : markerOp, child: const Icon(Icons.my_location_rounded, size: 36, color: Color(0xFF16A34A)))),
               if (dropLat != null && markerOp > 0) Marker(point: LatLng(dropLat!, dropLng!), width: 48, height: 48, child: Opacity(opacity: _phase == _BookingPhase.initial ? 1.0 : markerOp, child: const Icon(Icons.flag_rounded, size: 36, color: Color(0xFFDC2626)))),
             ]),
