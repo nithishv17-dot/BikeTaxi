@@ -448,74 +448,53 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     final safeCurrentLng = (currentLng != null && currentLng != 0.0) ? currentLng : null;
 
     if (pickupLat == null || dropLat == null || pickupLat == 0.0 || dropLat == 0.0 || pickupLng == 0.0 || dropLng == 0.0) {
-      final activeLat = pickupLat ?? dropLat ?? safeCurrentLat ?? 11.0168;
-      final activeLng = pickupLng ?? dropLng ?? safeCurrentLng ?? 76.9558;
-      _moveCameraSafely(LatLng(activeLat, activeLng), 15.5);
+      final activeLat = dropLat ?? pickupLat ?? safeCurrentLat ?? 11.0168;
+      final activeLng = dropLng ?? pickupLng ?? safeCurrentLng ?? 76.9558;
+      _moveCameraSafely(LatLng(activeLat, activeLng), 16.0);
       return;
     }
 
     final points = _roadRoutePoints.where((p) => p.latitude != 0.0 && p.longitude != 0.0).toList();
-    final allPoints = points.isNotEmpty
+    final List<LatLng> allPoints = points.isNotEmpty
         ? points
         : [LatLng(pickupLat!, pickupLng!), LatLng(dropLat!, dropLng!)];
 
-    double minLat = 90.0, maxLat = -90.0, minLng = 180.0, maxLng = -180.0;
-    for (final p in allPoints) {
-      if (p.latitude < minLat) minLat = p.latitude;
-      if (p.latitude > maxLat) maxLat = p.latitude;
-      if (p.longitude < minLng) minLng = p.longitude;
-      if (p.longitude > maxLng) maxLng = p.longitude;
+    try {
+      final bounds = LatLngBounds.fromPoints(allPoints);
+      final mediaQuery = MediaQuery.maybeOf(context);
+      final screenHeight = mediaQuery?.size.height ?? 800.0;
+
+      final bottomPadding = (_phase == _BookingPhase.routeReady)
+          ? screenHeight * 0.52
+          : screenHeight * 0.30;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _isMapReady) {
+          _mapController.fitCamera(
+            CameraFit.bounds(
+              bounds: bounds,
+              padding: EdgeInsets.only(
+                top: 100.0,
+                bottom: bottomPadding,
+                left: 50.0,
+                right: 50.0,
+              ),
+              maxZoom: 16.5,
+              minZoom: 14.5,
+            ),
+          );
+        }
+      });
+    } catch (_) {
+      _moveCameraSafely(LatLng(dropLat!, dropLng!), 15.5);
     }
-
-    final rawCenterLat = (minLat + maxLat) / 2.0;
-    final centerLng = (minLng + maxLng) / 2.0;
-
-    final latDiff = (maxLat - minLat).abs();
-    final lngDiff = (maxLng - minLng).abs();
-    final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
-
-    if (maxDiff > 1.5) {
-      _moveCameraSafely(LatLng(pickupLat!, pickupLng!), 14.5);
-      final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
-      if (scaffoldMessenger != null) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(
-            content: Text("Selected location is outside the operational area (max 100 km)."),
-            backgroundColor: Color(0xFFEF4444),
-          ),
-        );
-      }
-      return;
-    }
-
-    double targetZoom;
-    if (maxDiff < 0.01) {
-      targetZoom = 16.0;
-    } else if (maxDiff < 0.03) {
-      targetZoom = 15.2;
-    } else if (maxDiff < 0.08) {
-      targetZoom = 14.3;
-    } else if (maxDiff < 0.18) {
-      targetZoom = 13.5;
-    } else if (maxDiff < 0.40) {
-      targetZoom = 12.6;
-    } else {
-      targetZoom = 11.8;
-    }
-
-    // Offset camera center southwards so route stays visible above the bottom sheet modal
-    final offsetFactor = (_phase == _BookingPhase.routeReady) ? 0.35 : 0.10;
-    final offsetLat = (latDiff * offsetFactor) + 0.003;
-    final centerLat = rawCenterLat - offsetLat;
-
-    _moveCameraSafely(LatLng(centerLat, centerLng), targetZoom);
   }
 
   void _moveCameraSafely(LatLng center, double zoom) {
     try {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _isMapReady) {
-          _mapController.move(center, zoom.clamp(11.0, 17.5));
+          _mapController.move(center, zoom.clamp(14.0, 17.5));
         }
       });
     } catch (_) {}
