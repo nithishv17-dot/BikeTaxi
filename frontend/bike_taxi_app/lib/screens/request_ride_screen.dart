@@ -449,7 +449,18 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   }
 
   void _fitMapToRoute() {
-    if (pickupLat == null || dropLat == null || pickupLat == 0.0 || dropLat == 0.0 || pickupLng == 0.0 || dropLng == 0.0) return;
+    if (pickupLat == null || dropLat == null || pickupLat == 0.0 || dropLat == 0.0 || pickupLng == 0.0 || dropLng == 0.0) {
+      final activeLat = pickupLat ?? dropLat ?? currentLat ?? 11.0168;
+      final activeLng = pickupLng ?? dropLng ?? currentLng ?? 76.9558;
+      try {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _mapController.move(LatLng(activeLat, activeLng), 14.5);
+          }
+        });
+      } catch (_) {}
+      return;
+    }
     final validPoints = _roadRoutePoints.where((p) => p.latitude != 0.0 && p.longitude != 0.0).toList();
     final bounds = validPoints.isNotEmpty
         ? LatLngBounds.fromPoints(validPoints)
