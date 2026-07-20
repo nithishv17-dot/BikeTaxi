@@ -1989,23 +1989,34 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
               ]))
         : null;
 
-    final mapOptions = bounds == null
-        ? MapOptions(
-            initialCenter: LatLng(pickupLat != 0.0 ? pickupLat : 11.0, pickupLng != 0.0 ? pickupLng : 77.0),
-            initialZoom: 14.5,
-            minZoom: 11.0,
-            maxZoom: 18.0,
-          )
-        : MapOptions(
-            initialCameraFit: CameraFit.bounds(
-              bounds: bounds,
-              padding: const EdgeInsets.all(32),
-              minZoom: 12.0,
-              maxZoom: 16.0,
-            ),
-            minZoom: 12.0,
-            maxZoom: 18.0,
-          );
+    double targetZoom = 14.5;
+    LatLng center = LatLng(pickupLat != 0.0 ? pickupLat : 11.0168, pickupLng != 0.0 ? pickupLng : 76.9558);
+    if (bounds != null) {
+      final latDiff = (bounds.north - bounds.south).abs();
+      final lngDiff = (bounds.east - bounds.west).abs();
+      final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
+      center = bounds.center;
+      if (maxDiff < 0.01) {
+        targetZoom = 15.5;
+      } else if (maxDiff < 0.04) {
+        targetZoom = 14.5;
+      } else if (maxDiff < 0.10) {
+        targetZoom = 13.5;
+      } else if (maxDiff < 0.25) {
+        targetZoom = 12.5;
+      } else if (maxDiff < 0.60) {
+        targetZoom = 11.8;
+      } else {
+        targetZoom = 11.2;
+      }
+    }
+
+    final mapOptions = MapOptions(
+      initialCenter: center,
+      initialZoom: targetZoom.clamp(11.0, 16.0),
+      minZoom: 11.0,
+      maxZoom: 18.0,
+    );
 
     return SizedBox(
       height: 280,

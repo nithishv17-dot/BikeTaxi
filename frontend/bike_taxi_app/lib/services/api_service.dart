@@ -173,6 +173,20 @@ class ApiService {
     return results.isEmpty ? null : results.first;
   }
 
+  static List<double>? _findFirstPointInList(dynamic list) {
+    if (list is! List || list.isEmpty) return null;
+    if (list.length >= 2 && list[0] is num && list[1] is num) {
+      final double lng = (list[0] as num).toDouble();
+      final double lat = (list[1] as num).toDouble();
+      return [lat, lng];
+    }
+    for (final item in list) {
+      final res = _findFirstPointInList(item);
+      if (res != null) return res;
+    }
+    return null;
+  }
+
   static List<Map<String, dynamic>> _parsePhotonFeatures(dynamic data) {
     final features = data is Map<String, dynamic>
         ? List<dynamic>.from(data["features"] ?? const [])
@@ -188,17 +202,10 @@ class ApiService {
           final properties = Map<String, dynamic>.from(
             feature["properties"] as Map? ?? const {},
           );
-          final coordinates = geometry["coordinates"] is List
-              ? List<dynamic>.from(geometry["coordinates"] as List)
-              : const <dynamic>[];
-          // GeoJSON standard dictates that the first coordinate is Longitude (index 0)
-          // and the second coordinate is Latitude (index 1)
-          final double? lng = coordinates.isNotEmpty
-              ? (coordinates[0] as num?)?.toDouble()
-              : null;
-          final double? lat = coordinates.length > 1
-              ? (coordinates[1] as num?)?.toDouble()
-              : null;
+          final rawCoords = geometry["coordinates"];
+          final latLng = _findFirstPointInList(rawCoords);
+          final double? lat = latLng != null ? latLng[0] : null;
+          final double? lng = latLng != null ? latLng[1] : null;
           final addressParts = <String>[
             properties["name"]?.toString() ?? "",
             properties["street"]?.toString() ?? "",

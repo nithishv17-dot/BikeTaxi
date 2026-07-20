@@ -453,45 +453,61 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
   void _fitMapToRoute() {
     if (!_isMapReady) return;
+
+    final safeCurrentLat = (currentLat != null && currentLat != 0.0) ? currentLat : null;
+    final safeCurrentLng = (currentLng != null && currentLng != 0.0) ? currentLng : null;
+
     if (pickupLat == null || dropLat == null || pickupLat == 0.0 || dropLat == 0.0 || pickupLng == 0.0 || dropLng == 0.0) {
-      final safeCurrentLat = (currentLat != null && currentLat != 0.0) ? currentLat : null;
-      final safeCurrentLng = (currentLng != null && currentLng != 0.0) ? currentLng : null;
       final activeLat = pickupLat ?? dropLat ?? safeCurrentLat ?? 11.0168;
       final activeLng = pickupLng ?? dropLng ?? safeCurrentLng ?? 76.9558;
-      try {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _mapController.move(LatLng(activeLat, activeLng), 14.5);
-          }
-        });
-      } catch (_) {}
+      _moveCameraSafely(LatLng(activeLat, activeLng), 14.5);
       return;
     }
-    final validPoints = _roadRoutePoints.where((p) => p.latitude != 0.0 && p.longitude != 0.0).toList();
-    final bounds = validPoints.isNotEmpty
-        ? LatLngBounds.fromPoints(validPoints)
-        : LatLngBounds.fromPoints([
-            LatLng(pickupLat!, pickupLng!),
-            LatLng(dropLat!, dropLng!),
-          ]);
+
+    final points = _roadRoutePoints.where((p) => p.latitude != 0.0 && p.longitude != 0.0).toList();
+    final allPoints = points.isNotEmpty
+        ? points
+        : [LatLng(pickupLat!, pickupLng!), LatLng(dropLat!, dropLng!)];
+
+    double minLat = 90.0, maxLat = -90.0, minLng = 180.0, maxLng = -180.0;
+    for (final p in allPoints) {
+      if (p.latitude < minLat) minLat = p.latitude;
+      if (p.latitude > maxLat) maxLat = p.latitude;
+      if (p.longitude < minLng) minLng = p.longitude;
+      if (p.longitude > maxLng) maxLng = p.longitude;
+    }
+
+    final centerLat = (minLat + maxLat) / 2.0;
+    final centerLng = (minLng + maxLng) / 2.0;
+    final center = LatLng(centerLat, centerLng);
+
+    final latDiff = (maxLat - minLat).abs();
+    final lngDiff = (maxLng - minLng).abs();
+    final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
+
+    double targetZoom;
+    if (maxDiff < 0.01) {
+      targetZoom = 15.5;
+    } else if (maxDiff < 0.04) {
+      targetZoom = 14.5;
+    } else if (maxDiff < 0.10) {
+      targetZoom = 13.5;
+    } else if (maxDiff < 0.25) {
+      targetZoom = 12.5;
+    } else if (maxDiff < 0.60) {
+      targetZoom = 11.8;
+    } else {
+      targetZoom = 11.2;
+    }
+
+    _moveCameraSafely(center, targetZoom);
+  }
+
+  void _moveCameraSafely(LatLng center, double zoom) {
     try {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _mapController.fitCamera(CameraFit.bounds(
-            bounds: bounds,
-            padding: const EdgeInsets.all(32),
-            minZoom: 12.0,
-            maxZoom: 16.0,
-          ));
-
-          if (_mapController.camera.zoom < 12.0) {
-            final safeLat = pickupLat ?? 11.0168;
-            final safeLng = pickupLng ?? 76.9558;
-            _mapController.move(LatLng(safeLat, safeLng), 14.5);
-            if (pickupLat != null && dropLat != null && pickupLat != 0.0 && dropLat != 0.0) {
-              _fetchRoadRoute();
-            }
-          }
+        if (mounted && _isMapReady) {
+          _mapController.move(center, zoom.clamp(11.0, 16.0));
         }
       });
     } catch (_) {}
