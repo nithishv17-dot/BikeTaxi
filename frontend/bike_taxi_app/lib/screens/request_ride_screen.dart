@@ -450,7 +450,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     if (pickupLat == null || dropLat == null || pickupLat == 0.0 || dropLat == 0.0 || pickupLng == 0.0 || dropLng == 0.0) {
       final activeLat = pickupLat ?? dropLat ?? safeCurrentLat ?? 11.0168;
       final activeLng = pickupLng ?? dropLng ?? safeCurrentLng ?? 76.9558;
-      _moveCameraSafely(LatLng(activeLat, activeLng), 14.5);
+      _moveCameraSafely(LatLng(activeLat, activeLng), 15.5);
       return;
     }
 
@@ -467,16 +467,15 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       if (p.longitude > maxLng) maxLng = p.longitude;
     }
 
-    final centerLat = (minLat + maxLat) / 2.0;
+    final rawCenterLat = (minLat + maxLat) / 2.0;
     final centerLng = (minLng + maxLng) / 2.0;
-    final center = LatLng(centerLat, centerLng);
 
     final latDiff = (maxLat - minLat).abs();
     final lngDiff = (maxLng - minLng).abs();
     final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
 
     if (maxDiff > 1.5) {
-      _moveCameraSafely(LatLng(pickupLat!, pickupLng!), 14.0);
+      _moveCameraSafely(LatLng(pickupLat!, pickupLng!), 14.5);
       final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
       if (scaffoldMessenger != null) {
         scaffoldMessenger.showSnackBar(
@@ -491,27 +490,32 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
     double targetZoom;
     if (maxDiff < 0.01) {
-      targetZoom = 15.5;
-    } else if (maxDiff < 0.04) {
-      targetZoom = 14.5;
-    } else if (maxDiff < 0.10) {
+      targetZoom = 16.0;
+    } else if (maxDiff < 0.03) {
+      targetZoom = 15.2;
+    } else if (maxDiff < 0.08) {
+      targetZoom = 14.3;
+    } else if (maxDiff < 0.18) {
       targetZoom = 13.5;
-    } else if (maxDiff < 0.25) {
-      targetZoom = 12.5;
-    } else if (maxDiff < 0.60) {
-      targetZoom = 11.8;
+    } else if (maxDiff < 0.40) {
+      targetZoom = 12.6;
     } else {
-      targetZoom = 11.2;
+      targetZoom = 11.8;
     }
 
-    _moveCameraSafely(center, targetZoom);
+    // Offset camera center southwards so route stays visible above the bottom sheet modal
+    final offsetFactor = (_phase == _BookingPhase.routeReady) ? 0.35 : 0.10;
+    final offsetLat = (latDiff * offsetFactor) + 0.003;
+    final centerLat = rawCenterLat - offsetLat;
+
+    _moveCameraSafely(LatLng(centerLat, centerLng), targetZoom);
   }
 
   void _moveCameraSafely(LatLng center, double zoom) {
     try {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _isMapReady) {
-          _mapController.move(center, zoom.clamp(11.0, 16.0));
+          _mapController.move(center, zoom.clamp(11.0, 17.5));
         }
       });
     } catch (_) {}
@@ -678,6 +682,8 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
     if (_phase == _BookingPhase.initial && pickupLat != null && dropLat != null && !_hasSamePickupAndDrop) {
       _startRouteSequence();
+    } else {
+      _fitMapToRoute();
     }
     _saveToPrefs();
   }
