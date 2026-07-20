@@ -1993,6 +1993,8 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         ? MapOptions(
             initialCenter: LatLng(pickupLat != 0.0 ? pickupLat : 11.0, pickupLng != 0.0 ? pickupLng : 77.0),
             initialZoom: 14.5,
+            minZoom: 11.0,
+            maxZoom: 18.0,
           )
         : MapOptions(
             initialCameraFit: CameraFit.bounds(
@@ -2000,6 +2002,8 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
               padding: const EdgeInsets.all(32),
               maxZoom: 16.0,
             ),
+            minZoom: 11.0,
+            maxZoom: 18.0,
           );
 
     return SizedBox(

@@ -877,6 +877,8 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           options: MapOptions(
             initialCenter: initialCenter,
             initialZoom: 13.5,
+            minZoom: 11.0,
+            maxZoom: 18.0,
             onTap: (_, point) => _onMapTapped(point),
             onMapReady: () {
               setState(() {
