@@ -463,6 +463,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           _mapController.fitCamera(CameraFit.bounds(
             bounds: bounds,
             padding: const EdgeInsets.fromLTRB(40, 100, 40, 160),
+            maxZoom: 16.0,
           ));
         }
       });
