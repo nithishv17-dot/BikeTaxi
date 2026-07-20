@@ -475,6 +475,20 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     final lngDiff = (maxLng - minLng).abs();
     final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
 
+    if (maxDiff > 1.5) {
+      _moveCameraSafely(LatLng(pickupLat!, pickupLng!), 14.0);
+      final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+      if (scaffoldMessenger != null) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text("Selected location is outside the operational area (max 100 km)."),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
+      }
+      return;
+    }
+
     double targetZoom;
     if (maxDiff < 0.01) {
       targetZoom = 15.5;
@@ -595,7 +609,11 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       }
     });
     try {
-      final results = await ApiService.searchPhotonPlaces(query);
+      final results = await ApiService.searchPhotonPlaces(
+        query,
+        lat: pickupLat ?? currentLat,
+        lng: pickupLng ?? currentLng,
+      );
       if (!mounted) return;
       setState(() {
         if (isPickup) {

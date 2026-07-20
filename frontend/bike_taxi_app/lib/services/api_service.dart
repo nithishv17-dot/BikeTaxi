@@ -134,14 +134,19 @@ class ApiService {
   }
 
   static Future<List<Map<String, dynamic>>> searchPhotonPlaces(
-    String input,
-  ) async {
+    String input, {
+    double? lat,
+    double? lng,
+  }) async {
     if (input.trim().isEmpty) {
       return [];
     }
 
+    final double biasLat = lat ?? 11.0168;
+    final double biasLng = lng ?? 76.9558;
+
     final uri = Uri.parse(
-      "${photonBaseUrl}?q=${Uri.encodeQueryComponent(input.trim())}&limit=5",
+      "$photonBaseUrl?q=${Uri.encodeQueryComponent(input.trim())}&limit=8&lat=$biasLat&lon=$biasLng&countrycode=in",
     );
 
     final response = await http.get(uri, headers: _locationHeaders());
