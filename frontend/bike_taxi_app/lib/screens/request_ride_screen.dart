@@ -480,8 +480,18 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           _mapController.fitCamera(CameraFit.bounds(
             bounds: bounds,
             padding: const EdgeInsets.all(32),
+            minZoom: 12.0,
             maxZoom: 16.0,
           ));
+
+          if (_mapController.camera.zoom < 12.0) {
+            final safeLat = pickupLat ?? 11.0168;
+            final safeLng = pickupLng ?? 76.9558;
+            _mapController.move(LatLng(safeLat, safeLng), 14.5);
+            if (pickupLat != null && dropLat != null && pickupLat != 0.0 && dropLat != 0.0) {
+              _fetchRoadRoute();
+            }
+          }
         }
       });
     } catch (_) {}

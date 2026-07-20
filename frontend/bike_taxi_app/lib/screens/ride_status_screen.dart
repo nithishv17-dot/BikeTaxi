@@ -2000,9 +2000,10 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             initialCameraFit: CameraFit.bounds(
               bounds: bounds,
               padding: const EdgeInsets.all(32),
+              minZoom: 12.0,
               maxZoom: 16.0,
             ),
-            minZoom: 11.0,
+            minZoom: 12.0,
             maxZoom: 18.0,
           );
 
