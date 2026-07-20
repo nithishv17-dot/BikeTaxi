@@ -903,7 +903,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           options: MapOptions(
             initialCenter: initialCenter,
             initialZoom: 13.5,
-            minZoom: 11.0,
+            minZoom: 11.0, 
             maxZoom: 18.0,
             onTap: (_, point) => _onMapTapped(point),
             onMapReady: () {
@@ -912,6 +912,14 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
               });
               _fitMapToRoute();
             },
+            // --- ADD THIS BLOCK TO LOG THE ZOOM LEVEL ---
+            onPositionChanged: (MapPosition position, bool hasGesture) {
+              print('====================================');
+              print('CURRENT MAP ZOOM LEVEL: ${position.zoom}');
+              print('CURRENT MAP CENTER: LAT ${position.center.latitude}, LNG ${position.center.longitude}');
+              print('====================================');
+            },
+            // --------------------------------------------
           ),
           children: [
             TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", userAgentPackageName: "com.example.bike_taxi_app"),
