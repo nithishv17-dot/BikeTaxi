@@ -8,9 +8,18 @@ exports.getDrivers = async (req, res) => {
       { name: 1, phone: 1, isAvailable: 1, role: 1, location: 1 }
     ).lean();
 
+    const sanitizedDrivers = drivers.map((d) => {
+      const lat = Number(d.location?.lat);
+      const lng = Number(d.location?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
+        return { ...d, location: null };
+      }
+      return d;
+    });
+
     return res.status(200).json({
       message: "Drivers fetched successfully",
-      drivers
+      drivers: sanitizedDrivers
     });
   } catch (error) {
     console.log("GET DRIVERS ERROR:", error);

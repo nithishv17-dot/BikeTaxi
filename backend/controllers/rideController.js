@@ -178,10 +178,18 @@ const expireNegotiationIfNeeded = async (ride, io) => {
   return refreshedRide || ride;
 };
 
-const findNearestDriver = (drivers, pickupLatitude, pickupLongitude) =>
-  drivers.reduce((nearestDriver, currentDriver) => {
-    const currentLat = Number(currentDriver.location?.lat ?? 0);
-    const currentLng = Number(currentDriver.location?.lng ?? 0);
+const findNearestDriver = (drivers, pickupLatitude, pickupLongitude) => {
+  const validDrivers = drivers.filter((d) => {
+    const lat = Number(d.location?.lat);
+    const lng = Number(d.location?.lng);
+    return Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0;
+  });
+
+  if (!validDrivers.length) return null;
+
+  return validDrivers.reduce((nearestDriver, currentDriver) => {
+    const currentLat = Number(currentDriver.location.lat);
+    const currentLng = Number(currentDriver.location.lng);
     const currentDistance = Math.sqrt(
       Math.pow(currentLat - pickupLatitude, 2) +
         Math.pow(currentLng - pickupLongitude, 2)
@@ -195,6 +203,7 @@ const findNearestDriver = (drivers, pickupLatitude, pickupLongitude) =>
       ? { driver: currentDriver, distance: currentDistance }
       : nearestDriver;
   }, null)?.driver;
+};
 
 const ensureRideIsActionable = async (req, rideId) => {
   const io = req.app.get("io");
