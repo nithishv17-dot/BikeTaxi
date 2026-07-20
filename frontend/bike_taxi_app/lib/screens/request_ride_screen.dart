@@ -319,6 +319,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       currentLng = pos["lng"];
       currentLocationMessage = null;
     });
+    _fitMapToRoute();
   }
 
   // ── Validation Helpers ─────────────────────────────────────────────────────
@@ -446,6 +447,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     if (_sheetCtrl.isAttached) {
       _sheetCtrl.animateTo(0.30, duration: const Duration(milliseconds: 320), curve: Curves.easeInOut);
     }
+    _fitMapToRoute();
   }
 
   void _fitMapToRoute() {
