@@ -492,7 +492,8 @@ exports.acceptRide = async (req, res) => {
     ride.otp = Math.floor(1000 + Math.random() * 9000).toString();
     await ride.save();
 
-    io.emit("rideAccepted", ride);
+    const refreshedRide = await getPopulatedRide(ride._id);
+    io.emit("rideAccepted", refreshedRide);
 
     return res.status(200).json({
       message: "Ride accepted successfully",
@@ -539,7 +540,8 @@ exports.startRide = async (req, res) => {
     ride.status = "ongoing";
     await ride.save();
 
-    io.emit("rideStarted", ride);
+    const refreshedRide = await getPopulatedRide(ride._id);
+    io.emit("rideStarted", refreshedRide);
 
     return res.status(200).json({
       message: "Ride started successfully",
@@ -595,7 +597,8 @@ exports.completeRide = async (req, res) => {
       }
     }
 
-    io.emit("rideCompleted", ride);
+    const refreshedRide = await getPopulatedRide(ride._id);
+    io.emit("rideCompleted", refreshedRide);
 
     return res.status(200).json({
       message: "Ride completed successfully",
@@ -643,9 +646,10 @@ exports.cancelRide = async (req, res) => {
       }
     }
 
-    io.emit("rideCancelled", ride);
+    const refreshedRide = await getPopulatedRide(ride._id);
+    io.emit("rideCancelled", refreshedRide);
     if (ride.bookingMode === "negotiation") {
-      io.emit("negotiationClosed", await getPopulatedRide(ride._id));
+      io.emit("negotiationClosed", refreshedRide);
     }
 
     return res.status(200).json({
@@ -705,7 +709,8 @@ exports.payRide = async (req, res) => {
 
     const io = req.app.get("io");
     if (io) {
-      io.emit("rideCompleted", ride);
+      const refreshedRide = await getPopulatedRide(ride._id);
+      io.emit("rideCompleted", refreshedRide);
     }
 
     return res.status(200).json({
@@ -1101,9 +1106,10 @@ exports.getActiveRide = async (req, res) => {
       }).sort({ createdAt: -1 });
 
       if (pendingPaymentRide) {
+        const hydratedPending = await getPopulatedRide(pendingPaymentRide._id);
         return res.status(200).json({
           message: "Active ride found (Pending Payment)",
-          ride: pendingPaymentRide
+          ride: hydratedPending || pendingPaymentRide
         });
       }
 
@@ -1113,9 +1119,10 @@ exports.getActiveRide = async (req, res) => {
       });
     }
 
+    const hydratedRide = await getPopulatedRide(ride._id);
     return res.status(200).json({
       message: "Active ride found",
-      ride
+      ride: hydratedRide || ride
     });
   } catch (error) {
     console.log("GET ACTIVE RIDE ERROR:", error);

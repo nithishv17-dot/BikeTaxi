@@ -1163,6 +1163,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     required String fare,
     required String pickupAddress,
     required String dropAddress,
+    required String status,
   }) {
     final name = driverMap["name"]?.toString() ?? "Captain";
     final phone = driverMap["phone"]?.toString() ?? "";
@@ -1214,16 +1215,16 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             ),
             child: Row(
               children: [
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: Color(0xFF4ADE80),
+                Icon(
+                  status == "ongoing" ? Icons.directions_bike_rounded : Icons.check_circle_rounded,
+                  color: status == "ongoing" ? const Color(0xFF60A5FA) : const Color(0xFF4ADE80),
                   size: 17,
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  "Driver Assigned · On the way",
+                Text(
+                  status == "ongoing" ? "Trip Ongoing · En route" : "Driver Assigned · On the way",
                   style: TextStyle(
-                    color: Color(0xFF4ADE80),
+                    color: status == "ongoing" ? const Color(0xFF60A5FA) : const Color(0xFF4ADE80),
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
                     letterSpacing: 0.2,
@@ -1340,7 +1341,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                 ),
 
                 // OTP digits
-                if (otp.isNotEmpty) ...[
+                if (otp.isNotEmpty && status == "accepted") ...[
                   const SizedBox(height: 18),
                   Container(
                     width: double.infinity,
@@ -2240,8 +2241,8 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      // Driver assigned card (user view only, when accepted)
-                      if (status == "accepted" &&
+                      // Driver assigned card (user view only, when accepted or ongoing)
+                      if ((status == "accepted" || status == "ongoing") &&
                           !widget.isDriver &&
                           driverMap != null) ...[
                         _buildDriverAssignedCard(
@@ -2250,6 +2251,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                           fare: fare,
                           pickupAddress: pickupAddress,
                           dropAddress: dropAddress,
+                          status: status,
                         ),
                       ],
                       if (isWaiting) ...[
