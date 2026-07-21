@@ -789,6 +789,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         context.go('/ride-status/${response["ride"]["_id"]}');
       }
     } catch (e) {
+      debugPrint("API Failure in _requestRide: $e");
       if (!mounted) return;
       String errMessage = e.toString().replaceFirst("Exception: ", "");
       if (errMessage.toLowerCase().contains("no drivers available")) {
@@ -796,8 +797,9 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       }
       setState(() => message = errMessage);
     } finally {
-      if (!mounted) return;
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
