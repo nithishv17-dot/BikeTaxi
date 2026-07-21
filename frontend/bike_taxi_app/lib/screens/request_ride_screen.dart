@@ -465,40 +465,25 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         LatLng(dropLat!, dropLng!),
       ]);
 
-      final double latDiff = (bounds.north - bounds.south).abs();
-      final double lngDiff = (bounds.east - bounds.west).abs();
-      final double maxDiff = max(latDiff, lngDiff);
+      final double bottomPixelPadding = (_phase == _BookingPhase.routeReady) ? 300.0 : 160.0;
 
-      // Determine precise target zoom level based on coordinate distance
-      double targetZoom;
-      if (maxDiff < 0.008) {
-        targetZoom = 16.2;
-      } else if (maxDiff < 0.02) {
-        targetZoom = 15.4;
-      } else if (maxDiff < 0.05) {
-        targetZoom = 14.5;
-      } else if (maxDiff < 0.12) {
-        targetZoom = 13.5;
-      } else if (maxDiff < 0.30) {
-        targetZoom = 12.2;
-      } else if (maxDiff < 0.80) {
-        targetZoom = 11.0;
-      } else if (maxDiff < 2.5) {
-        targetZoom = 9.0;
-      } else if (maxDiff < 8.0) {
-        targetZoom = 7.0;
-      } else {
-        targetZoom = 4.5;
-      }
-
-      // Offset camera center downwards slightly so route is framed nicely above bottom sheet
-      final double midLat = (bounds.north + bounds.south) / 2.0;
-      final double midLng = (bounds.east + bounds.west) / 2.0;
-
-      final double latOffset = (maxDiff * 0.18).clamp(0.002, 0.4);
-      final LatLng center = LatLng(midLat - latOffset, midLng);
-
-      _moveCameraSafely(center, targetZoom);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _isMapReady) {
+          _mapController.fitCamera(
+            CameraFit.bounds(
+              bounds: bounds,
+              padding: EdgeInsets.only(
+                top: 100.0,
+                bottom: bottomPixelPadding,
+                left: 48.0,
+                right: 48.0,
+              ),
+              maxZoom: 17.0,
+              minZoom: 1.0,
+            ),
+          );
+        }
+      });
     } catch (_) {
       _moveCameraSafely(LatLng(dropLat!, dropLng!), 15.5);
     }
