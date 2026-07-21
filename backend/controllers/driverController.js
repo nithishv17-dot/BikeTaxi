@@ -3,23 +3,27 @@ const User = require("../models/User");
 
 exports.getDrivers = async (req, res) => {
   try {
+    // 1. Force the database to ONLY return online drivers
     const drivers = await User.find(
-      { role: "driver" },
+      { role: "driver", isAvailable: true },
       { name: 1, phone: 1, isAvailable: 1, role: 1, location: 1 }
     ).lean();
 
-    const sanitizedDrivers = drivers.map((d) => {
+    // 2. Filter out corrupt locations completely (do NOT return null)
+    const validDrivers = drivers.filter((d) => {
       const lat = Number(d.location?.lat);
       const lng = Number(d.location?.lng);
+
+      // Keep only drivers with valid, non-zero coordinates
       if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
-        return { ...d, location: null };
+        return false;
       }
-      return d;
+      return true;
     });
 
     return res.status(200).json({
       message: "Drivers fetched successfully",
-      drivers: sanitizedDrivers
+      drivers: validDrivers
     });
   } catch (error) {
     console.log("GET DRIVERS ERROR:", error);
