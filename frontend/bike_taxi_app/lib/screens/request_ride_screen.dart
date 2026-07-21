@@ -12,7 +12,6 @@ import '../services/socket_service.dart';
 import '../services/routing_service.dart';
 import '../theme/premium_ui.dart';
 import '../utils/location_display.dart';
-import 'ride_status_screen.dart';
 
 enum _BookingPhase { initial, calculating, routeReady }
 
@@ -31,7 +30,6 @@ class RequestRideScreen extends StatefulWidget {
 }
 
 class _RequestRideScreenState extends State<RequestRideScreen> with TickerProviderStateMixin {
-  // ── Location Controllers ──────────────────────────────────────────────────
   final TextEditingController pickupController = TextEditingController();
   final TextEditingController destinationController = TextEditingController();
   Timer? pickupDebounce;
@@ -41,7 +39,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   String selectedPaymentMethod = "Cash";
   String bookingMode = "normal";
   final TextEditingController _offerController = TextEditingController();
-  
+
   String pickupInput = "";
   String dropInput = "";
   String? pickupAddress;
@@ -52,7 +50,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   String? dropPlaceId;
   double? dropLat;
   double? dropLng;
-  
+
   bool isSearchingPickup = false;
   bool isSearchingDrop = false;
   bool pickupNoResults = false;
@@ -64,7 +62,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   bool isResolvingCurrentLocation = false;
   String? currentLocationMessage;
   double? currentLat;
-  
+
   List<LatLng> _roadRoutePoints = [];
   double? _apiDistanceKm;
   double? _apiDurationMinutes;
@@ -72,83 +70,37 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   List<Map<String, dynamic>> availableDrivers = [];
   Timer? _driversPollTimer;
 
-  // ── Map ───────────────────────────────────────────────────────────────────
   final MapController _mapController = MapController();
   bool _isMapReady = false;
 
-  // ── Booking Phase & Animations ─────────────────────────────────────────────
   _BookingPhase _phase = _BookingPhase.initial;
   late final AnimationController _routeAnimCtrl;
   late final AnimationController _glassAnimCtrl;
   late final AnimationController _contentAnimCtrl;
   late final DraggableScrollableController _sheetCtrl;
-  
-  late final Animation<double> _polylineProgress;
-  late final Animation<double> _markerOpacity;
+
   late final Animation<double> _glassBlur;
   late final Animation<double> _glassOpacity;
 
-  // Staggered Content Animations
   late final Animation<double> _rideTypeAnim;
   late final Animation<double> _fareAnim;
   late final Animation<double> _etaAnim;
-  late final Animation<double> _paymentAnim;
-  late final Animation<double> _bookBtnAnim;
-  bool _sheetAutoExpanded = false;
 
   @override
   void initState() {
     super.initState();
     _sheetCtrl = DraggableScrollableController();
 
-    _routeAnimCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
-    _polylineProgress = CurvedAnimation(
-      parent: _routeAnimCtrl,
-      curve: const Interval(0.0, 0.8, curve: Curves.easeOutCubic),
-    );
-    _markerOpacity = CurvedAnimation(
-      parent: _routeAnimCtrl,
-      curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
-    );
+    _routeAnimCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000));
 
-    _glassAnimCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _glassBlur = Tween<double>(begin: 0, end: 14).animate(
-      CurvedAnimation(parent: _glassAnimCtrl, curve: Curves.easeOut),
-    );
-    _glassOpacity = Tween<double>(begin: 0.88, end: 0.60).animate(
-      CurvedAnimation(parent: _glassAnimCtrl, curve: Curves.easeOut),
-    );
+    _glassAnimCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _glassBlur = Tween<double>(begin: 0, end: 14).animate(CurvedAnimation(parent: _glassAnimCtrl, curve: Curves.easeOut));
+    _glassOpacity = Tween<double>(begin: 0.88, end: 0.60).animate(CurvedAnimation(parent: _glassAnimCtrl, curve: Curves.easeOut));
 
-    _contentAnimCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
-    _rideTypeAnim = CurvedAnimation(
-      parent: _contentAnimCtrl,
-      curve: const Interval(0.0, 0.45, curve: Curves.easeOutCubic),
-    );
-    _fareAnim = CurvedAnimation(
-      parent: _contentAnimCtrl,
-      curve: const Interval(0.12, 0.55, curve: Curves.easeOutCubic),
-    );
-    _etaAnim = CurvedAnimation(
-      parent: _contentAnimCtrl,
-      curve: const Interval(0.25, 0.65, curve: Curves.easeOutCubic),
-    );
-    _paymentAnim = CurvedAnimation(
-      parent: _contentAnimCtrl,
-      curve: const Interval(0.38, 0.78, curve: Curves.easeOutCubic),
-    );
-    _bookBtnAnim = CurvedAnimation(
-      parent: _contentAnimCtrl,
-      curve: const Interval(0.55, 1.0, curve: Curves.easeOutCubic),
-    );
+    _contentAnimCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+    _rideTypeAnim = CurvedAnimation(parent: _contentAnimCtrl, curve: const Interval(0.0, 0.45, curve: Curves.easeOutCubic));
+    _fareAnim = CurvedAnimation(parent: _contentAnimCtrl, curve: const Interval(0.12, 0.55, curve: Curves.easeOutCubic));
+    _etaAnim = CurvedAnimation(parent: _contentAnimCtrl, curve: const Interval(0.25, 0.65, curve: Curves.easeOutCubic));
 
     _startDriversPolling();
     _loadCurrentLocation();
@@ -164,7 +116,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       final driverId = data["driverId"]?.toString();
       final double? lat = data["lat"] is num ? (data["lat"] as num).toDouble() : double.tryParse("${data["lat"]}");
       final double? lng = data["lng"] is num ? (data["lng"] as num).toDouble() : double.tryParse("${data["lng"]}");
-      
+
       if (driverId != null && lat != null && lng != null) {
         setState(() {
           final index = availableDrivers.indexWhere((d) => d["_id"]?.toString() == driverId);
@@ -266,7 +218,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     super.dispose();
   }
 
-  // ── Drivers Polling ────────────────────────────────────────────────────────
   void _startDriversPolling() {
     _driversPollTimer?.cancel();
     _fetchAvailableDrivers();
@@ -301,7 +252,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     } catch (_) {}
   }
 
-  // ── Location Resolution ───────────────────────────────────────────────────
   Future<void> _loadCurrentLocation() async {
     if (isResolvingCurrentLocation) return;
     setState(() {
@@ -323,7 +273,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     _fitMapToRoute();
   }
 
-  // ── Validation Helpers ─────────────────────────────────────────────────────
   bool get canSubmit => !isLoading && !isSearchingPickup && !isSearchingDrop && !_hasSamePickupAndDrop &&
       _isValidSelectedLocation(input: pickupController.text, address: pickupAddress, lat: pickupLat, lng: pickupLng) &&
       _isValidSelectedLocation(input: destinationController.text, address: dropAddress, lat: dropLat, lng: dropLng);
@@ -339,7 +288,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     return pickupAddress == dropAddress || (pickupLat == dropLat && pickupLng == dropLng);
   }
 
-  // ── Mathematical Calculations ──────────────────────────────────────────────
   double? get _distanceKm {
     if (_apiDistanceKm != null) return _apiDistanceKm;
     if (pickupLat == null || pickupLng == null || dropLat == null || dropLng == null) return null;
@@ -353,20 +301,20 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   double? get estimatedFare {
     final distanceKm = _distanceKm;
     if (distanceKm == null) return null;
-    
+
     const double baseFare = 15;
     const double baseDistanceKm = 1.5;
     const double perKmRate = 9;
     const double aboveTenKmRate = 8;
     const double platformFee = 5;
     const double gstPercent = 5;
-    
+
     double distanceFare = 0;
     if (distanceKm > baseDistanceKm) {
       final double remaining = distanceKm - baseDistanceKm;
       distanceFare = distanceKm <= 10 ? remaining * perKmRate : (8.5 * perKmRate) + ((distanceKm - 10) * aboveTenKmRate);
     }
-    
+
     final double subtotal = baseFare + distanceFare;
     final double beforeGst = subtotal + platformFee;
     return (beforeGst + (beforeGst * (gstPercent / 100))).clamp(40, 100000).toDouble();
@@ -381,7 +329,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     return "${(km / 25 * 60).ceil()} min";
   }
 
-  // ── Animation Sequence ───────────────────────────────────────────────────
   Future<void> _fetchRoadRoute() async {
     if (pickupLat == null || pickupLng == null || dropLat == null || dropLng == null) return;
     try {
@@ -411,20 +358,15 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   Future<void> _startRouteSequence() async {
     if (!mounted) return;
 
-    // Quick initial camera fit based on pickup & drop
     _fitMapToRoute();
-
-    // Fetch turn-by-turn road route geometry
     await _fetchRoadRoute();
 
     if (!mounted) return;
 
     setState(() {
       _phase = _BookingPhase.routeReady;
-      _sheetAutoExpanded = true;
     });
 
-    // Re-fit camera to encompass all road detour points
     _fitMapToRoute();
 
     if (_sheetCtrl.isAttached) {
@@ -438,7 +380,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     _routeAnimCtrl.reset();
     _glassAnimCtrl.reset();
     _contentAnimCtrl.reset();
-    _sheetAutoExpanded = false;
     _phase = _BookingPhase.initial;
     if (_sheetCtrl.isAttached) {
       _sheetCtrl.animateTo(0.30, duration: const Duration(milliseconds: 320), curve: Curves.easeInOut);
@@ -485,7 +426,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
                 right: 48.0,
               ),
               maxZoom: 17.0,
-              minZoom: 1.0,
+              minZoom: 11.0,
             ),
           );
         }
@@ -505,7 +446,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     } catch (_) {}
   }
 
-  // ── Input Processing & Search Logic ────────────────────────────────────────
   void _clearPickupSelection() {
     pickupAddress = null;
     pickupPlaceId = null;
@@ -763,7 +703,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     await _reverseGeocodeAndUpdate(pos['lat']!, pos['lng']!, isPickup: true, fallbackAddress: "Current pickup address");
   }
 
-  // ── Dispatch Ride ──────────────────────────────────────────────────────────
+  // FIXED: Send the negotiated fare if in negotiation mode & log errors
   void _requestRide() async {
     if (!canSubmit) {
       setState(() {
@@ -779,10 +719,16 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       isLoading = true;
       message = "";
     });
+
     try {
+      double finalFare = estimatedFare ?? 0;
+      if (bookingMode == "negotiation" && _offerController.text.trim().isNotEmpty) {
+        finalFare = double.tryParse(_offerController.text.trim()) ?? finalFare;
+      }
+
       final response = await ApiService.requestRide(
         widget.userId, pickupAddress!, pickupLat!, pickupLng!, dropAddress!, dropLat!, dropLng!,
-        selectedPaymentMethod, pickupPlaceId, dropPlaceId, bookingMode, estimatedFare ?? 0,
+        selectedPaymentMethod, pickupPlaceId, dropPlaceId, bookingMode, finalFare,
       );
       if (!mounted) return;
       if (response["ride"] != null && response["ride"]["_id"] != null) {
@@ -803,7 +749,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     }
   }
 
-  // ── Modals & Sheets Layouts ────────────────────────────────────────────────
   void _showFareBreakdown() {
     final double? fare = estimatedFare;
     if (fare == null) return;
@@ -842,7 +787,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     );
   }
 
-  // ── Core Screen Structural Scaffold Hierarchy ──────────────────────────────
   @override
   Widget build(BuildContext context) {
     final body = _buildBody(context);
@@ -883,15 +827,24 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     );
   }
 
+  // FIXED: Strictly filter offline drivers and invalid locations
   Widget _buildFullScreenMap() {
     final initialCenter = (currentLat != null && currentLng != null && currentLat != 0.0 && currentLng != 0.0)
         ? LatLng(currentLat!, currentLng!)
         : const LatLng(11.0168, 76.9558);
-    final driverMarkers = availableDrivers.map((driver) {
+
+    final driverMarkers = availableDrivers.where((driver) {
+      if (driver["isAvailable"] != true) return false;
       final loc = driver["location"];
-      final double? lat = loc != null && loc["lat"] is num ? (loc["lat"] as num).toDouble() : double.tryParse("${loc?["lat"]}");
-      final double? lng = loc != null && loc["lng"] is num ? (loc["lng"] as num).toDouble() : double.tryParse("${loc?["lng"]}");
-      if (lat == null || lng == null) return const Marker(point: LatLng(0, 0), child: SizedBox.shrink());
+      if (loc == null) return false;
+      final double? lat = loc["lat"] is num ? (loc["lat"] as num).toDouble() : double.tryParse("${loc["lat"]}");
+      final double? lng = loc["lng"] is num ? (loc["lng"] as num).toDouble() : double.tryParse("${loc["lng"]}");
+      if (lat == null || lng == null || lat == 0.0 || lng == 0.0) return false;
+      return true;
+    }).map((driver) {
+      final loc = driver["location"];
+      final double lat = loc["lat"] is num ? (loc["lat"] as num).toDouble() : double.parse("${loc["lat"]}");
+      final double lng = loc["lng"] is num ? (loc["lng"] as num).toDouble() : double.parse("${loc["lng"]}");
       return Marker(
         point: LatLng(lat, lng),
         width: 36,
@@ -901,7 +854,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           child: const Icon(Icons.directions_bike_rounded, color: AppPalette.primary, size: 18),
         ),
       );
-    }).where((m) => m.point.latitude != 0.0).toList();
+    }).toList();
 
     List<LatLng> polylinePoints = [];
     if (pickupLat != null && dropLat != null && pickupLat != 0.0 && dropLat != 0.0 && pickupLng != 0.0 && dropLng != 0.0) {
@@ -1071,7 +1024,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     );
   }
 
- Widget _buildDraggableSheet(BuildContext context) {
+  Widget _buildDraggableSheet(BuildContext context) {
     return DraggableScrollableSheet(
       controller: _sheetCtrl,
       initialChildSize: 0.30,
@@ -1089,7 +1042,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
               borderRadius: const BorderRadius.vertical(top: Radius.circular(28)), 
               border: Border.all(color: Colors.white.withOpacity(0.10)),
             ),
-            // Replaced SingleChildScrollView with ListView to pass the correct physics/scrollController
             child: ListView(
               controller: scrollController,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -1453,7 +1405,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   void _showNegotiationModal() {
     final suggested = estimatedFare ?? 0.0;
     double offerAmount = double.tryParse(_offerController.text.trim()) ?? (suggested * 0.85);
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
