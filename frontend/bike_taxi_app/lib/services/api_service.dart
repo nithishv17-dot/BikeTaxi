@@ -146,7 +146,7 @@ class ApiService {
     final double biasLng = lng ?? 76.9558;
 
     final uri = Uri.parse(
-      "$photonBaseUrl?q=${Uri.encodeQueryComponent(input.trim())}&limit=8&lat=$biasLat&lon=$biasLng&countrycode=in",
+      "$photonBaseUrl?q=${Uri.encodeQueryComponent(input.trim())}&limit=8&lat=$biasLat&lon=$biasLng",
     );
 
     final response = await http.get(uri, headers: _locationHeaders());

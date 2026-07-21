@@ -459,38 +459,46 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       return;
     }
 
-    // Frame camera strictly using Pickup & Drop endpoints so both markers and the route line are framed cleanly
-    final List<LatLng> framingPoints = [
-      LatLng(pickupLat!, pickupLng!),
-      LatLng(dropLat!, dropLng!),
-    ];
-
     try {
-      final bounds = LatLngBounds.fromPoints(framingPoints);
-      final mediaQuery = MediaQuery.maybeOf(context);
-      final screenHeight = mediaQuery?.size.height ?? 800.0;
+      final bounds = LatLngBounds.fromPoints([
+        LatLng(pickupLat!, pickupLng!),
+        LatLng(dropLat!, dropLng!),
+      ]);
 
-      final bottomPadding = (_phase == _BookingPhase.routeReady)
-          ? screenHeight * 0.48
-          : screenHeight * 0.28;
+      final double latDiff = (bounds.north - bounds.south).abs();
+      final double lngDiff = (bounds.east - bounds.west).abs();
+      final double maxDiff = max(latDiff, lngDiff);
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _isMapReady) {
-          _mapController.fitCamera(
-            CameraFit.bounds(
-              bounds: bounds,
-              padding: EdgeInsets.only(
-                top: 90.0,
-                bottom: bottomPadding,
-                left: 48.0,
-                right: 48.0,
-              ),
-              maxZoom: 16.5,
-              minZoom: 9.0,
-            ),
-          );
-        }
-      });
+      // Determine precise target zoom level based on coordinate distance
+      double targetZoom;
+      if (maxDiff < 0.008) {
+        targetZoom = 16.2;
+      } else if (maxDiff < 0.02) {
+        targetZoom = 15.4;
+      } else if (maxDiff < 0.05) {
+        targetZoom = 14.5;
+      } else if (maxDiff < 0.12) {
+        targetZoom = 13.5;
+      } else if (maxDiff < 0.30) {
+        targetZoom = 12.2;
+      } else if (maxDiff < 0.80) {
+        targetZoom = 11.0;
+      } else if (maxDiff < 2.5) {
+        targetZoom = 9.0;
+      } else if (maxDiff < 8.0) {
+        targetZoom = 7.0;
+      } else {
+        targetZoom = 4.5;
+      }
+
+      // Offset camera center downwards slightly so route is framed nicely above bottom sheet
+      final double midLat = (bounds.north + bounds.south) / 2.0;
+      final double midLng = (bounds.east + bounds.west) / 2.0;
+
+      final double latOffset = (maxDiff * 0.18).clamp(0.002, 0.4);
+      final LatLng center = LatLng(midLat - latOffset, midLng);
+
+      _moveCameraSafely(center, targetZoom);
     } catch (_) {
       _moveCameraSafely(LatLng(dropLat!, dropLng!), 15.5);
     }
@@ -500,7 +508,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     try {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _isMapReady) {
-          _mapController.move(center, zoom.clamp(14.0, 17.5));
+          _mapController.move(center, zoom.clamp(4.0, 17.5));
         }
       });
     } catch (_) {}
