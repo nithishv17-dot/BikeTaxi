@@ -454,7 +454,12 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       return;
     }
 
-    // Frame camera strictly using Pickup & Drop endpoints to prevent road detours from inflating zoom bounds
+    if (pickupLat == dropLat && pickupLng == dropLng) {
+      _moveCameraSafely(LatLng(pickupLat!, pickupLng!), 16.0);
+      return;
+    }
+
+    // Frame camera strictly using Pickup & Drop endpoints so both markers and the route line are framed cleanly
     final List<LatLng> framingPoints = [
       LatLng(pickupLat!, pickupLng!),
       LatLng(dropLat!, dropLng!),
@@ -466,7 +471,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       final screenHeight = mediaQuery?.size.height ?? 800.0;
 
       final bottomPadding = (_phase == _BookingPhase.routeReady)
-          ? screenHeight * 0.50
+          ? screenHeight * 0.48
           : screenHeight * 0.28;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -481,7 +486,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
                 right: 48.0,
               ),
               maxZoom: 16.5,
-              minZoom: 14.2,
+              minZoom: 9.0,
             ),
           );
         }
@@ -657,10 +662,12 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       if (_hasSamePickupAndDrop) {
         pickupError = "Pickup location must be different from drop";
         dropError = "Drop location must be different from pickup";
+      } else if (pickupLat != null && dropLat != null && pickupLat != 0.0 && dropLat != 0.0) {
+        _roadRoutePoints = [LatLng(pickupLat!, pickupLng!), LatLng(dropLat!, dropLng!)];
       }
     });
 
-    if (_phase == _BookingPhase.initial && pickupLat != null && dropLat != null && !_hasSamePickupAndDrop) {
+    if (pickupLat != null && dropLat != null && pickupLat != 0.0 && dropLat != 0.0 && !_hasSamePickupAndDrop) {
       _startRouteSequence();
     } else {
       _fitMapToRoute();
@@ -680,7 +687,15 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         pickupPlaceId = "map_tap_pickup";
         pickupError = null;
         message = "Finding pickup address...";
+        if (dropLat != null && dropLat != 0.0) {
+          _roadRoutePoints = [LatLng(pickupLat!, pickupLng!), LatLng(dropLat!, dropLng!)];
+        }
       });
+      if (dropLat != null && dropLat != 0.0 && !_hasSamePickupAndDrop) {
+        _startRouteSequence();
+      } else {
+        _fitMapToRoute();
+      }
       _reverseGeocodeAndUpdate(point.latitude, point.longitude, isPickup: true, fallbackAddress: "Pickup address from map");
     } else {
       const label = "Resolving drop address...";
@@ -693,7 +708,15 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         dropPlaceId = "map_tap_drop";
         dropError = null;
         message = "Finding drop address...";
+        if (pickupLat != null && pickupLat != 0.0) {
+          _roadRoutePoints = [LatLng(pickupLat!, pickupLng!), LatLng(dropLat!, dropLng!)];
+        }
       });
+      if (pickupLat != null && pickupLat != 0.0 && !_hasSamePickupAndDrop) {
+        _startRouteSequence();
+      } else {
+        _fitMapToRoute();
+      }
       _reverseGeocodeAndUpdate(point.latitude, point.longitude, isPickup: false, fallbackAddress: "Drop address from map");
     }
   }
@@ -723,8 +746,10 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       }
     });
 
-    if (pickupLat != null && dropLat != null && _phase == _BookingPhase.initial && !_hasSamePickupAndDrop) {
+    if (pickupLat != null && dropLat != null && pickupLat != 0.0 && dropLat != 0.0 && !_hasSamePickupAndDrop) {
       _startRouteSequence();
+    } else {
+      _fitMapToRoute();
     }
     _saveToPrefs();
   }
