@@ -411,6 +411,10 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   Future<void> _startRouteSequence() async {
     if (!mounted) return;
 
+    // Quick initial camera fit based on pickup & drop
+    _fitMapToRoute();
+
+    // Fetch turn-by-turn road route geometry
     await _fetchRoadRoute();
 
     if (!mounted) return;
@@ -420,6 +424,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       _sheetAutoExpanded = true;
     });
 
+    // Re-fit camera to encompass all road detour points
     _fitMapToRoute();
 
     if (_sheetCtrl.isAttached) {
@@ -460,10 +465,11 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     }
 
     try {
-      final bounds = LatLngBounds.fromPoints([
-        LatLng(pickupLat!, pickupLng!),
-        LatLng(dropLat!, dropLng!),
-      ]);
+      final List<LatLng> pointsToFrame = (_roadRoutePoints.length >= 2)
+          ? _roadRoutePoints
+          : [LatLng(pickupLat!, pickupLng!), LatLng(dropLat!, dropLng!)];
+
+      final bounds = LatLngBounds.fromPoints(pointsToFrame);
 
       final double bottomPixelPadding = (_phase == _BookingPhase.routeReady) ? 300.0 : 160.0;
 
