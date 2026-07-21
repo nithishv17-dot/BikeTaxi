@@ -39,8 +39,11 @@ class RoutingService {
 
           // Decodes the GeoJSON coordinates and flips [Lng, Lat] to Flutter's [Lat, Lng] (LatLng) format
           final List<LatLng> points = coordinates.map((coord) {
-            final double lng = (coord[0] as num).toDouble();
-            final double lat = (coord[1] as num).toDouble();
+            // OSRM returns [Longitude, Latitude]
+            final double lng = (coord[0] as num).toDouble(); 
+            final double lat = (coord[1] as num).toDouble(); 
+            
+            // latlong2 expects LatLng(Latitude, Longitude)
             return LatLng(lat, lng);
           }).toList();
 
