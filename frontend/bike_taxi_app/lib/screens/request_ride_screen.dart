@@ -444,26 +444,13 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   void _fitMapToRoute() {
     if (!_isMapReady) return;
 
-    // 1. Validate pickup & drop coordinates against null or corrupt (0.0, 0.0) values
-    final bool isPickupValid = pickupLat != null && pickupLng != null && pickupLat != 0.0 && pickupLng != 0.0;
-    final bool isDropValid = dropLat != null && dropLng != null && dropLat != 0.0 && dropLng != 0.0;
     final safeCurrentLat = (currentLat != null && currentLat != 0.0) ? currentLat : null;
     final safeCurrentLng = (currentLng != null && currentLng != 0.0) ? currentLng : null;
 
-    if (!isPickupValid && !isDropValid) {
-      final activeLat = safeCurrentLat ?? 11.0168;
-      final activeLng = safeCurrentLng ?? 76.9558;
-      _moveCameraSafely(LatLng(activeLat, activeLng), 15.5);
-      return;
-    }
-
-    if (isPickupValid && !isDropValid) {
-      _moveCameraSafely(LatLng(pickupLat!, pickupLng!), 16.0);
-      return;
-    }
-
-    if (!isPickupValid && isDropValid) {
-      _moveCameraSafely(LatLng(dropLat!, dropLng!), 16.0);
+    if (pickupLat == null || dropLat == null || pickupLat == 0.0 || dropLat == 0.0 || pickupLng == 0.0 || dropLng == 0.0) {
+      final activeLat = dropLat ?? pickupLat ?? safeCurrentLat ?? 11.0168;
+      final activeLng = dropLng ?? pickupLng ?? safeCurrentLng ?? 76.9558;
+      _moveCameraSafely(LatLng(activeLat, activeLng), 16.0);
       return;
     }
 
@@ -472,49 +459,48 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       return;
     }
 
-    // 2. Gather all valid route points (or safely fall back to pickup & drop points)
-    final List<LatLng> pointsToFit = _roadRoutePoints
-        .where((p) => p.latitude != 0.0 && p.longitude != 0.0)
-        .toList();
-
-    if (pointsToFit.isEmpty) {
-      pointsToFit.addAll([
+    try {
+      final bounds = LatLngBounds.fromPoints([
         LatLng(pickupLat!, pickupLng!),
         LatLng(dropLat!, dropLng!),
       ]);
-    }
 
-    try {
-      // 3. Compute True Bounding Box encompassing full polyline path
-      final bounds = LatLngBounds.fromPoints(pointsToFit);
+      final double latDiff = (bounds.north - bounds.south).abs();
+      final double lngDiff = (bounds.east - bounds.west).abs();
+      final double maxDiff = max(latDiff, lngDiff);
 
-      // 4. Determine dynamic bottom padding to clear the draggable sheet UI
-      final mediaQuery = MediaQuery.maybeOf(context);
-      final screenHeight = mediaQuery?.size.height ?? 800.0;
-      final bottomPadding = (_phase == _BookingPhase.routeReady)
-          ? (screenHeight * 0.45).clamp(280.0, 420.0)
-          : 220.0;
+      // Determine precise target zoom level based on coordinate distance
+      double targetZoom;
+      if (maxDiff < 0.008) {
+        targetZoom = 16.2;
+      } else if (maxDiff < 0.02) {
+        targetZoom = 15.4;
+      } else if (maxDiff < 0.05) {
+        targetZoom = 14.5;
+      } else if (maxDiff < 0.12) {
+        targetZoom = 13.5;
+      } else if (maxDiff < 0.30) {
+        targetZoom = 12.2;
+      } else if (maxDiff < 0.80) {
+        targetZoom = 11.0;
+      } else if (maxDiff < 2.5) {
+        targetZoom = 9.0;
+      } else if (maxDiff < 8.0) {
+        targetZoom = 7.0;
+      } else {
+        targetZoom = 4.5;
+      }
 
-      // 5. Native Map SDK bounds fitting with explicit pixel padding
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _isMapReady) {
-          _mapController.fitCamera(
-            CameraFit.bounds(
-              bounds: bounds,
-              padding: EdgeInsets.only(
-                top: 80.0,
-                bottom: bottomPadding,
-                left: 50.0,
-                right: 50.0,
-              ),
-              maxZoom: 17.0,
-              minZoom: 3.0,
-            ),
-          );
-        }
-      });
+      // Offset camera center downwards slightly so route is framed nicely above bottom sheet
+      final double midLat = (bounds.north + bounds.south) / 2.0;
+      final double midLng = (bounds.east + bounds.west) / 2.0;
+
+      final double latOffset = (maxDiff * 0.18).clamp(0.002, 0.4);
+      final LatLng center = LatLng(midLat - latOffset, midLng);
+
+      _moveCameraSafely(center, targetZoom);
     } catch (_) {
-      _moveCameraSafely(LatLng(pickupLat!, pickupLng!), 15.5);
+      _moveCameraSafely(LatLng(dropLat!, dropLng!), 15.5);
     }
   }
 
