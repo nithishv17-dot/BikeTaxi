@@ -403,7 +403,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     if (_sheetCtrl.isAttached) {
       _sheetCtrl.animateTo(0.30, duration: const Duration(milliseconds: 320), curve: Curves.easeInOut);
     }
-    _fitMapToRoute(force: true);
   }
 
   void _animateCameraTo(LatLng targetCenter, double targetZoom) {
