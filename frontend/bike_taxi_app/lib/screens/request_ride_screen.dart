@@ -811,13 +811,22 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   }
 
   Future<void> _selectCurrentPickupAddress(Map<String, double> pos) async {
+    final lat = pos['lat'] ?? currentLat ?? lastKnownLat;
+    final lng = pos['lng'] ?? currentLng ?? lastKnownLng;
+
+    if (lat == null || lng == null || lat == 0.0 || lng == 0.0) return;
+
     _selectSuggestion({
       "placeId": "gps_current_loc",
       "address": "Resolving current address...",
-      "lat": pos['lat'],
-      "lng": pos['lng'],
+      "lat": lat,
+      "lng": lng,
     }, isPickup: true);
-    await _reverseGeocodeAndUpdate(pos['lat']!, pos['lng']!, isPickup: true, fallbackAddress: "Current pickup address");
+
+    // Smoothly animate map camera to current location at zoom 15.5
+    _animateCameraTo(LatLng(lat, lng), 15.5);
+
+    await _reverseGeocodeAndUpdate(lat, lng, isPickup: true, fallbackAddress: "Current pickup address");
   }
 
   // FIXED: Send the negotiated fare if in negotiation mode & log errors
@@ -1099,8 +1108,28 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   Widget _buildCurrentLocationTile() {
     return GestureDetector(
       onTap: isResolvingCurrentLocation ? null : () async {
-        final pos = await LocationService.getCurrentPosition();
-        if (pos != null) await _selectCurrentPickupAddress(pos);
+        Map<String, double>? initialPos;
+        if (currentLat != null && currentLng != null && currentLat != 0.0 && currentLng != 0.0) {
+          initialPos = {'lat': currentLat!, 'lng': currentLng!};
+        } else if (lastKnownLat != null && lastKnownLng != null && lastKnownLat != 0.0 && lastKnownLng != 0.0) {
+          initialPos = {'lat': lastKnownLat!, 'lng': lastKnownLng!};
+        }
+
+        if (initialPos != null) {
+          await _selectCurrentPickupAddress(initialPos);
+        }
+
+        final freshPos = await LocationService.getCurrentPosition();
+        if (freshPos != null && mounted) {
+          setState(() {
+            currentLat = freshPos['lat'];
+            currentLng = freshPos['lng'];
+            lastKnownLat = freshPos['lat'];
+            lastKnownLng = freshPos['lng'];
+          });
+          _saveToPrefs();
+          await _selectCurrentPickupAddress(freshPos);
+        }
       },
       child: Container(
         height: 52,
