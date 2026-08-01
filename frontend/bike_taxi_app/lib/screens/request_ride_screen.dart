@@ -84,19 +84,23 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   bool _userSelectedDropInSession = false;
   bool _hasInitializedInitialCamera = false;
 
-  String _currentCameraAction = "Initial Location Pending";
+  String _currentCameraAction = "Initial User Focus";
   double _currentCameraZoom = 15.5;
+  double _currentCameraBearing = 0.0;
   LatLng _currentCameraCenter = const LatLng(11.0168, 76.9558);
   final List<String> _cameraHistory = [];
 
-  void _recordCameraAction(String action, LatLng center, double zoom) {
+  void _recordCameraAction(String action, LatLng center, double zoom, {double bearing = 0.0}) {
     if (!mounted) return;
     setState(() {
       _currentCameraAction = action;
       _currentCameraCenter = center;
       _currentCameraZoom = zoom;
+      _currentCameraBearing = bearing;
 
-      final historyEntry = "$action → Zoom ${zoom.toStringAsFixed(2)}";
+      final latFmt = center.latitude.toStringAsFixed(4);
+      final lngFmt = center.longitude.toStringAsFixed(4);
+      final historyEntry = "${zoom.toStringAsFixed(2)} → $action ($latFmt, $lngFmt)";
       if (_cameraHistory.isEmpty || _cameraHistory.first != historyEntry) {
         _cameraHistory.insert(0, historyEntry);
         if (_cameraHistory.length > 3) {
@@ -1068,7 +1072,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         _buildFullScreenMap(),
         Positioned(top: topPadding + 8, left: 16, right: 16, child: _buildFloatingBrandHeader()),
         Positioned(top: topPadding + 78, left: 16, right: 16, child: _buildFloatingLocationCard()),
-        Positioned(top: topPadding + 195, left: 16, child: _buildCameraDebugPanel()),
+        Positioned(top: topPadding + 195, right: 16, child: _buildCameraDebugPanel()),
         if (_phase == _BookingPhase.calculating)
           Positioned(bottom: MediaQuery.of(context).size.height * 0.25 + 8, left: 0, right: 0, child: Center(child: _buildCalculatingPill())),
         if (_isUserPanning || _phase == _BookingPhase.routeReady)
@@ -1083,17 +1087,18 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   }
 
   Widget _buildCameraDebugPanel() {
-    final latStr = _currentCameraCenter.latitude.toStringAsFixed(5);
-    final lngStr = _currentCameraCenter.longitude.toStringAsFixed(5);
+    final latStr = _currentCameraCenter.latitude.toStringAsFixed(4);
+    final lngStr = _currentCameraCenter.longitude.toStringAsFixed(4);
     final zoomStr = _currentCameraZoom.toStringAsFixed(2);
+    final bearingStr = _currentCameraBearing.toStringAsFixed(1);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
-          width: 250,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          width: 220,
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: const Color(0xFF0F172A).withOpacity(0.85),
             borderRadius: BorderRadius.circular(16),
@@ -1111,53 +1116,90 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF22C55E),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    "CAMERA MONITOR",
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFFF4A261),
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                "Action: $_currentCameraAction",
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 2),
-              Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("Zoom: $zoomStr", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF38BDF8))),
-                  Text("Center: $latStr, $lngStr", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.7))),
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF22C55E),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      const Text(
+                        "CAMERA LIVE",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF22C55E),
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    "Zoom: $zoomStr",
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF38BDF8),
+                    ),
+                  ),
                 ],
+              ),
+              const SizedBox(height: 5),
+              Text(
+                "Lat: $latStr",
+                style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+              Text(
+                "Lng: $lngStr",
+                style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+              Row(
+                children: [
+                  Text(
+                    "Bearing: $bearingStr°  ",
+                    style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.7)),
+                  ),
+                  Text(
+                    "Tilt: 0.0°",
+                    style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.7)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4A261).withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  "Action: $_currentCameraAction",
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFF4A261)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               if (_cameraHistory.isNotEmpty) ...[
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 4),
                   child: Divider(color: Colors.white12, height: 1),
                 ),
-                Text("Camera History:", style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white.withOpacity(0.5))),
+                Text(
+                  "Camera History:",
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white.withOpacity(0.5)),
+                ),
                 const SizedBox(height: 2),
                 ..._cameraHistory.asMap().entries.map((entry) {
                   return Text(
                     "${entry.key + 1}. ${entry.value}",
-                    style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.85)),
+                    style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.85)),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   );
@@ -1266,6 +1308,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           if (position.center != null && position.zoom != null) {
             _currentCameraCenter = position.center!;
             _currentCameraZoom = position.zoom!;
+            _currentCameraBearing = position.rotation;
           }
 
           final isAnimating = _cameraAnimCtrl?.isAnimating == true;
@@ -1278,9 +1321,10 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
           if (hasGesture && !isAnimating) {
             _recordCameraAction(
-              "Manual Map Movement",
+              "Manual Pan/Zoom",
               position.center ?? _currentCameraCenter,
               position.zoom ?? _currentCameraZoom,
+              bearing: position.rotation,
             );
           }
         },
