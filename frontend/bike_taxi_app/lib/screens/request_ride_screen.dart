@@ -77,6 +77,11 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   bool _isSequenceRunning = false;
   AnimationController? _cameraAnimCtrl;
 
+  double? lastKnownLat;
+  double? lastKnownLng;
+  bool _hasFocusedInitialLocation = false;
+  bool _pendingLocationFocus = false;
+
   _BookingPhase _phase = _BookingPhase.initial;
   late final AnimationController _routeAnimCtrl;
   late final AnimationController _glassAnimCtrl;
@@ -150,6 +155,11 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       await prefs.setDouble('destination_lng', dropLng ?? 0.0);
 
       await prefs.setString('offer_fare', _offerController.text);
+
+      if (currentLat != null && currentLng != null && currentLat != 0.0 && currentLng != 0.0) {
+        await prefs.setDouble('last_known_lat', currentLat!);
+        await prefs.setDouble('last_known_lng', currentLng!);
+      }
     } catch (_) {}
   }
 
@@ -169,10 +179,17 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       final dLng = prefs.getDouble('destination_lng') ?? 0.0;
 
       final oFare = prefs.getString('offer_fare') ?? '';
+      final kLat = prefs.getDouble('last_known_lat') ?? 0.0;
+      final kLng = prefs.getDouble('last_known_lng') ?? 0.0;
 
       if (!mounted) return;
 
       setState(() {
+        if (kLat != 0.0 && kLng != 0.0) {
+          lastKnownLat = kLat;
+          lastKnownLng = kLng;
+        }
+
         if (pText.isNotEmpty) {
           pickupController.text = pText;
           pickupInput = pText;
@@ -196,14 +213,42 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         }
       });
 
-      if (pickupLat != null && dropLat != null && !_hasSamePickupAndDrop && _phase == _BookingPhase.initial) {
-        Future.delayed(const Duration(milliseconds: 200), () {
-          if (mounted && pickupLat != null && dropLat != null) {
-            _startRouteSequence();
-          }
-        });
+      if (!_hasFocusedInitialLocation) {
+        _focusCurrentLocationIfAvailable();
       }
     } catch (_) {}
+  }
+
+  @override
+  void didUpdateWidget(covariant RequestRideScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isEmbedded) {
+      _focusCurrentLocationIfAvailable();
+    }
+  }
+
+  void _focusCurrentLocationIfAvailable({bool forceAnim = false}) {
+    final targetLat = (currentLat != null && currentLat != 0.0)
+        ? currentLat
+        : (lastKnownLat != null && lastKnownLat != 0.0)
+            ? lastKnownLat
+            : null;
+    final targetLng = (currentLng != null && currentLng != 0.0)
+        ? currentLng
+        : (lastKnownLng != null && lastKnownLng != 0.0)
+            ? lastKnownLng
+            : null;
+
+    if (targetLat == null || targetLng == null) return;
+
+    if (!_hasFocusedInitialLocation || forceAnim) {
+      if (_isMapReady) {
+        _animateCameraTo(LatLng(targetLat, targetLng), 15.5);
+        _hasFocusedInitialLocation = true;
+      } else {
+        _pendingLocationFocus = true;
+      }
+    }
   }
 
   @override
@@ -273,9 +318,12 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       }
       currentLat = pos["lat"];
       currentLng = pos["lng"];
+      lastKnownLat = pos["lat"];
+      lastKnownLng = pos["lng"];
       currentLocationMessage = null;
     });
-    _fitMapToRoute();
+    _saveToPrefs();
+    _focusCurrentLocationIfAvailable(forceAnim: true);
   }
 
   bool get canSubmit => !isLoading && !isSearchingPickup && !isSearchingDrop && !_hasSamePickupAndDrop &&
@@ -935,7 +983,9 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   Widget _buildFullScreenMap() {
     final initialCenter = (currentLat != null && currentLng != null && currentLat != 0.0 && currentLng != 0.0)
         ? LatLng(currentLat!, currentLng!)
-        : const LatLng(11.0168, 76.9558);
+        : (lastKnownLat != null && lastKnownLng != null && lastKnownLat != 0.0 && lastKnownLng != 0.0)
+            ? LatLng(lastKnownLat!, lastKnownLng!)
+            : const LatLng(11.0168, 76.9558);
 
     final driverMarkers = availableDrivers.where((driver) {
       if (driver["isAvailable"] != true) return false;
@@ -971,7 +1021,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       mapController: _mapController,
       options: MapOptions(
         initialCenter: initialCenter,
-        initialZoom: 13.5,
+        initialZoom: 15.5,
         minZoom: 11.0, 
         maxZoom: 18.0,
         onTap: (_, point) => _onMapTapped(point),
@@ -986,11 +1036,12 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           setState(() {
             _isMapReady = true;
           });
-          if (_pendingFitOnMapReady) {
+          if (_pendingLocationFocus || !_hasFocusedInitialLocation) {
+            _pendingLocationFocus = false;
+            _focusCurrentLocationIfAvailable(forceAnim: true);
+          } else if (_pendingFitOnMapReady) {
             _pendingFitOnMapReady = false;
             _fitMapToRoute(force: true);
-          } else {
-            _fitMapToRoute();
           }
         },
       ),
