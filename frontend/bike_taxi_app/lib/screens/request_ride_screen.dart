@@ -81,6 +81,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   double? lastKnownLng;
   bool _hasFocusedInitialLocation = false;
   bool _pendingLocationFocus = false;
+  bool _userSelectedDropInSession = false;
 
   _BookingPhase _phase = _BookingPhase.initial;
   late final AnimationController _routeAnimCtrl;
@@ -447,50 +448,54 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     final userLoc = _getBestUserLocation();
     if (userLoc == null) return;
 
-    final driverLoc = _getNearestDriverLocation(userLoc);
+    if (_userSelectedDropInSession) {
+      final driverLoc = _getNearestDriverLocation(userLoc);
 
-    if (driverLoc != null) {
-      // Driver location available: Smoothly fit User + Driver
-      try {
-        final bounds = LatLngBounds.fromPoints([userLoc, driverLoc]);
+      if (driverLoc != null) {
+        // Driver location available: Smoothly fit User + Driver
+        try {
+          final bounds = LatLngBounds.fromPoints([userLoc, driverLoc]);
 
-        double bottomPixelPadding = 200.0;
-        if (_sheetCtrl.isAttached) {
-          final screenHeight = MediaQuery.of(context).size.height;
-          bottomPixelPadding = (screenHeight * _sheetCtrl.size) + 40.0;
-        } else if (_phase == _BookingPhase.routeReady) {
-          bottomPixelPadding = 300.0;
-        }
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _isMapReady) {
-            try {
-              final cameraFit = CameraFit.bounds(
-                bounds: bounds,
-                padding: EdgeInsets.only(
-                  top: 100.0,
-                  bottom: bottomPixelPadding,
-                  left: 48.0,
-                  right: 48.0,
-                ),
-                maxZoom: 16.5,
-                minZoom: 12.5,
-              );
-              final targetCenter = cameraFit.fit(_mapController.camera).center;
-              final targetZoom = cameraFit.fit(_mapController.camera).zoom;
-              _animateCameraTo(targetCenter, targetZoom);
-            } catch (_) {
-              _animateCameraTo(userLoc, 15.5);
-            }
+          double bottomPixelPadding = 200.0;
+          if (_sheetCtrl.isAttached) {
+            final screenHeight = MediaQuery.of(context).size.height;
+            bottomPixelPadding = (screenHeight * _sheetCtrl.size) + 40.0;
+          } else if (_phase == _BookingPhase.routeReady) {
+            bottomPixelPadding = 300.0;
           }
-        });
-      } catch (_) {
-        _animateCameraTo(userLoc, 15.5);
+
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _isMapReady) {
+              try {
+                final cameraFit = CameraFit.bounds(
+                  bounds: bounds,
+                  padding: EdgeInsets.only(
+                    top: 100.0,
+                    bottom: bottomPixelPadding,
+                    left: 48.0,
+                    right: 48.0,
+                  ),
+                  maxZoom: 16.5,
+                  minZoom: 12.5,
+                );
+                final targetCenter = cameraFit.fit(_mapController.camera).center;
+                final targetZoom = cameraFit.fit(_mapController.camera).zoom;
+                _animateCameraTo(targetCenter, targetZoom);
+              } catch (_) {
+                _animateCameraTo(userLoc, 15.5);
+              }
+            }
+          });
+          return;
+        } catch (_) {
+          _animateCameraTo(userLoc, 15.5);
+          return;
+        }
       }
-    } else {
-      // Driver location not available: Focus on User's current location at zoom 15.5
-      _animateCameraTo(userLoc, 15.5);
     }
+
+    // Default / Initial state: Focus on User's current location at zoom 15.5
+    _animateCameraTo(userLoc, 15.5);
   }
 
   Future<void> _startRouteSequence() async {
@@ -658,6 +663,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   }
 
   void _clearDropSelection() {
+    _userSelectedDropInSession = false;
     dropAddress = null;
     dropPlaceId = null;
     dropLat = null;
@@ -790,7 +796,8 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         pickupLng = lng;
         pickupError = null;
         pickupSuggestions = [];
-      } else {
+      if (!isPickup) {
+        _userSelectedDropInSession = true;
         destinationController.text = address;
         dropInput = address;
         dropAddress = address;
@@ -840,6 +847,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       _reverseGeocodeAndUpdate(point.latitude, point.longitude, isPickup: true, fallbackAddress: "Pickup address from map");
     } else {
       const label = "Resolving drop address...";
+      _userSelectedDropInSession = true;
       setState(() {
         dropLat = point.latitude;
         dropLng = point.longitude;
@@ -1124,12 +1132,10 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           setState(() {
             _isMapReady = true;
           });
+          _pendingFitOnMapReady = false;
           if (_pendingLocationFocus || !_hasFocusedInitialLocation) {
             _pendingLocationFocus = false;
             _focusCurrentLocationIfAvailable(forceAnim: true);
-          } else if (_pendingFitOnMapReady) {
-            _pendingFitOnMapReady = false;
-            _fitMapToRoute(force: true);
           }
         },
       ),
