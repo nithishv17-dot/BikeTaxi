@@ -240,12 +240,16 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
             ? lastKnownLng
             : null;
 
-    if (targetLat == null || targetLng == null) return;
+    if (targetLat == null || targetLng == null) {
+      _pendingLocationFocus = true;
+      return;
+    }
 
     if (!_hasFocusedInitialLocation || forceAnim) {
       if (_isMapReady) {
         _animateCameraTo(LatLng(targetLat, targetLng), 15.5);
         _hasFocusedInitialLocation = true;
+        _pendingLocationFocus = false;
       } else {
         _pendingLocationFocus = true;
       }
@@ -430,10 +434,11 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       final double? dLat = loc["lat"] is num ? (loc["lat"] as num).toDouble() : double.tryParse("${loc["lat"]}");
       final double? dLng = loc["lng"] is num ? (loc["lng"] as num).toDouble() : double.tryParse("${loc["lng"]}");
       if (dLat == null || dLng == null || dLat == 0.0 || dLng == 0.0) continue;
+      if (!_isValidLatitude(dLat) || !_isValidLongitude(dLng)) continue;
 
       final dist = (dLat - userLoc.latitude) * (dLat - userLoc.latitude) +
           (dLng - userLoc.longitude) * (dLng - userLoc.longitude);
-      if (dist < minDistance) {
+      if (dist < minDistance && dist < 0.25) {
         minDistance = dist;
         nearest = LatLng(dLat, dLng);
       }
@@ -476,7 +481,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
                     right: 48.0,
                   ),
                   maxZoom: 16.5,
-                  minZoom: 12.5,
+                  minZoom: 13.0,
                 );
                 final targetCenter = cameraFit.fit(_mapController.camera).center;
                 final targetZoom = cameraFit.fit(_mapController.camera).zoom;
