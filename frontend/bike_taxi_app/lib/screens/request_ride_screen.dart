@@ -82,6 +82,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   bool _hasFocusedInitialLocation = false;
   bool _pendingLocationFocus = false;
   bool _userSelectedDropInSession = false;
+  bool _hasInitializedInitialCamera = false;
 
   _BookingPhase _phase = _BookingPhase.initial;
   late final AnimationController _routeAnimCtrl;
@@ -228,7 +229,17 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     }
   }
 
-  void _focusCurrentLocationIfAvailable({bool forceAnim = false}) {
+  void _moveCameraDirectly(LatLng targetCenter, double targetZoom, {required String reason}) {
+    if (!_isMapReady || !mounted) return;
+    debugPrint("CAMERA MOVE DIRECT [_moveCameraDirectly]: reason=$reason | target=(${targetCenter.latitude.toStringAsFixed(5)}, ${targetCenter.longitude.toStringAsFixed(5)}) | zoom=$targetZoom");
+    try {
+      _mapController.move(targetCenter, targetZoom);
+    } catch (e) {
+      debugPrint("CAMERA MOVE DIRECT ERROR: $e");
+    }
+  }
+
+  void _focusCurrentLocationIfAvailable({bool force = false}) {
     final targetLat = (currentLat != null && currentLat != 0.0)
         ? currentLat
         : (lastKnownLat != null && lastKnownLat != 0.0)
@@ -241,13 +252,18 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
             : null;
 
     if (targetLat == null || targetLng == null) {
+      debugPrint("INITIAL CAMERA FOCUS: Location coordinates not available yet. Pending focus.");
       _pendingLocationFocus = true;
       return;
     }
 
-    if (!_hasFocusedInitialLocation || forceAnim) {
+    final targetCenter = LatLng(targetLat, targetLng);
+
+    if (!_hasInitializedInitialCamera || force) {
       if (_isMapReady) {
-        _animateCameraTo(LatLng(targetLat, targetLng), 15.5);
+        debugPrint("INITIAL CAMERA FOCUS: Direct snap to user location ($targetLat, $targetLng) @ zoom 15.5");
+        _moveCameraDirectly(targetCenter, 15.5, reason: "Initial User Location Focus");
+        _hasInitializedInitialCamera = true;
         _hasFocusedInitialLocation = true;
         _pendingLocationFocus = false;
       } else {
@@ -548,13 +564,22 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     }
   }
 
-  void _animateCameraTo(LatLng targetCenter, double targetZoom) {
+  void _animateCameraTo(LatLng targetCenter, double targetZoom, {String reason = "Unspecified"}) {
     if (!_isMapReady || !mounted) return;
     _cameraAnimCtrl?.stop();
     _cameraAnimCtrl?.dispose();
 
     final startCenter = _mapController.camera.center;
     final startZoom = _mapController.camera.zoom;
+
+    debugPrint("CAMERA MOVE ANIMATED [_animateCameraTo]: reason=$reason | from=(${startCenter.latitude.toStringAsFixed(5)}, ${startCenter.longitude.toStringAsFixed(5)} @ $startZoom) -> to=(${targetCenter.latitude.toStringAsFixed(5)}, ${targetCenter.longitude.toStringAsFixed(5)} @ $targetZoom)");
+
+    // Guard: If initial camera has not been set or startCenter is (0,0) or startZoom <= 2.0, move directly instead of interpolating from (0,0)
+    if (!_hasInitializedInitialCamera || (startCenter.latitude == 0.0 && startCenter.longitude == 0.0) || startZoom <= 2.0) {
+      _moveCameraDirectly(targetCenter, targetZoom, reason: "Direct Snap (Bypass 0,0/World Zoom) - $reason");
+      _hasInitializedInitialCamera = true;
+      return;
+    }
 
     _cameraAnimCtrl = AnimationController(
       vsync: this,
@@ -582,20 +607,27 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       return;
     }
 
+    // Strict Guard: On INITIAL Home Screen load, completely prevent route bounds fitting
+    if (!_hasInitializedInitialCamera) {
+      debugPrint("GUARD BLOCKED: _fitMapToRoute called before initial camera setup.");
+      _focusCurrentLocationIfAvailable();
+      return;
+    }
+
     if (_isUserPanning && !force) return;
 
     final safeCurrentLat = (currentLat != null && currentLat != 0.0) ? currentLat : null;
     final safeCurrentLng = (currentLng != null && currentLng != 0.0) ? currentLng : null;
 
     if (pickupLat == null || dropLat == null || pickupLat == 0.0 || dropLat == 0.0 || pickupLng == 0.0 || dropLng == 0.0) {
-      final activeLat = dropLat ?? pickupLat ?? safeCurrentLat ?? 11.0168;
-      final activeLng = dropLng ?? pickupLng ?? safeCurrentLng ?? 76.9558;
-      _animateCameraTo(LatLng(activeLat, activeLng), 16.0);
+      final activeLat = safeCurrentLat ?? pickupLat ?? dropLat ?? 11.0168;
+      final activeLng = safeCurrentLng ?? pickupLng ?? dropLng ?? 76.9558;
+      _animateCameraTo(LatLng(activeLat, activeLng), 15.5, reason: "Fit Map To Route (Single Location)");
       return;
     }
 
     if (pickupLat == dropLat && pickupLng == dropLng) {
-      _animateCameraTo(LatLng(pickupLat!, pickupLng!), 16.0);
+      _animateCameraTo(LatLng(pickupLat!, pickupLng!), 15.5, reason: "Fit Map To Route (Same Pickup & Drop)");
       return;
     }
 
@@ -605,6 +637,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           : [LatLng(pickupLat!, pickupLng!), LatLng(dropLat!, dropLng!)];
 
       final bounds = LatLngBounds.fromPoints(pointsToFrame);
+      debugPrint("FULL ROUTE FIT: bounds sw=${bounds.southWest} ne=${bounds.northEast}");
 
       double bottomPixelPadding = 200.0;
       if (_sheetCtrl.isAttached) {
@@ -626,30 +659,20 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
                 right: 48.0,
               ),
               maxZoom: 17.0,
-              minZoom: 11.0,
+              minZoom: 12.5,
             );
             final targetCenter = cameraFit.fit(_mapController.camera).center;
             final targetZoom = cameraFit.fit(_mapController.camera).zoom;
-            _animateCameraTo(targetCenter, targetZoom);
-          } catch (_) {
-            _mapController.fitCamera(
-              CameraFit.bounds(
-                bounds: bounds,
-                padding: EdgeInsets.only(
-                  top: 100.0,
-                  bottom: bottomPixelPadding,
-                  left: 48.0,
-                  right: 48.0,
-                ),
-                maxZoom: 17.0,
-                minZoom: 11.0,
-              ),
-            );
+            _animateCameraTo(targetCenter, targetZoom, reason: "Full Route Camera Fit");
+          } catch (e) {
+            debugPrint("FULL ROUTE FIT ERROR: $e");
+            _animateCameraTo(LatLng(pickupLat!, pickupLng!), 15.5, reason: "Full Route Fallback");
           }
         }
       });
-    } catch (_) {
-      _animateCameraTo(LatLng(dropLat!, dropLng!), 15.5);
+    } catch (e) {
+      debugPrint("FULL ROUTE FIT CATCH ERROR: $e");
+      _animateCameraTo(LatLng(pickupLat!, pickupLng!), 15.5, reason: "Full Route Catch Fallback");
     }
   }
 
