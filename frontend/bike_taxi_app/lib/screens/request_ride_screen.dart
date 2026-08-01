@@ -72,6 +72,10 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
   final MapController _mapController = MapController();
   bool _isMapReady = false;
+  bool _pendingFitOnMapReady = false;
+  bool _isUserPanning = false;
+  bool _isSequenceRunning = false;
+  AnimationController? _cameraAnimCtrl;
 
   _BookingPhase _phase = _BookingPhase.initial;
   late final AnimationController _routeAnimCtrl;
@@ -210,6 +214,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     dropDebounce?.cancel();
     pickupController.dispose();
     destinationController.dispose();
+    _cameraAnimCtrl?.dispose();
     _routeAnimCtrl.dispose();
     _glassAnimCtrl.dispose();
     _contentAnimCtrl.dispose();
@@ -355,40 +360,87 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     }
   }
 
-  Future<void> _startRouteSequence() async {
+  Future<void> _startRouteSequence({bool focusDrop = true}) async {
     if (!mounted) return;
+    if (_isSequenceRunning) return;
+    _isSequenceRunning = true;
 
-    _fitMapToRoute();
-    await _fetchRoadRoute();
+    try {
+      await _fetchRoadRoute();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _phase = _BookingPhase.routeReady;
-    });
+      setState(() {
+        _phase = _BookingPhase.routeReady;
+        _isUserPanning = false;
+      });
 
-    _fitMapToRoute();
+      // DELAYED ROUTE FIT: Focus on selected drop point when choosing destination
+      if (focusDrop && dropLat != null && dropLng != null && dropLat != 0.0 && dropLng != 0.0) {
+        _animateCameraTo(LatLng(dropLat!, dropLng!), 15.5);
+      } else {
+        _fitMapToRoute(force: true);
+      }
 
-    if (_sheetCtrl.isAttached) {
-      _sheetCtrl.animateTo(0.60, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+      if (_sheetCtrl.isAttached) {
+        _sheetCtrl.animateTo(0.60, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+      }
+      _contentAnimCtrl.reset();
+      _contentAnimCtrl.forward();
+    } finally {
+      _isSequenceRunning = false;
     }
-    _contentAnimCtrl.reset();
-    _contentAnimCtrl.forward();
   }
 
   void _resetRouteSequence() {
     _routeAnimCtrl.reset();
     _glassAnimCtrl.reset();
     _contentAnimCtrl.reset();
-    _phase = _BookingPhase.initial;
+    setState(() {
+      _phase = _BookingPhase.initial;
+      _isUserPanning = false;
+    });
     if (_sheetCtrl.isAttached) {
       _sheetCtrl.animateTo(0.30, duration: const Duration(milliseconds: 320), curve: Curves.easeInOut);
     }
-    _fitMapToRoute();
+    _fitMapToRoute(force: true);
   }
 
-  void _fitMapToRoute() {
-    if (!_isMapReady) return;
+  void _animateCameraTo(LatLng targetCenter, double targetZoom) {
+    if (!_isMapReady || !mounted) return;
+    _cameraAnimCtrl?.stop();
+    _cameraAnimCtrl?.dispose();
+
+    final startCenter = _mapController.camera.center;
+    final startZoom = _mapController.camera.zoom;
+
+    _cameraAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
+
+    final anim = CurvedAnimation(parent: _cameraAnimCtrl!, curve: Curves.fastOutSlowIn);
+
+    _cameraAnimCtrl!.addListener(() {
+      if (!mounted || !_isMapReady) return;
+      final lat = startCenter.latitude + (targetCenter.latitude - startCenter.latitude) * anim.value;
+      final lng = startCenter.longitude + (targetCenter.longitude - startCenter.longitude) * anim.value;
+      final zoom = startZoom + (targetZoom - startZoom) * anim.value;
+      try {
+        _mapController.move(LatLng(lat, lng), zoom);
+      } catch (_) {}
+    });
+
+    _cameraAnimCtrl!.forward();
+  }
+
+  void _fitMapToRoute({bool force = false}) {
+    if (!_isMapReady) {
+      _pendingFitOnMapReady = true;
+      return;
+    }
+
+    if (_isUserPanning && !force) return;
 
     final safeCurrentLat = (currentLat != null && currentLat != 0.0) ? currentLat : null;
     final safeCurrentLng = (currentLng != null && currentLng != 0.0) ? currentLng : null;
@@ -396,12 +448,12 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     if (pickupLat == null || dropLat == null || pickupLat == 0.0 || dropLat == 0.0 || pickupLng == 0.0 || dropLng == 0.0) {
       final activeLat = dropLat ?? pickupLat ?? safeCurrentLat ?? 11.0168;
       final activeLng = dropLng ?? pickupLng ?? safeCurrentLng ?? 76.9558;
-      _moveCameraSafely(LatLng(activeLat, activeLng), 16.0);
+      _animateCameraTo(LatLng(activeLat, activeLng), 16.0);
       return;
     }
 
     if (pickupLat == dropLat && pickupLng == dropLng) {
-      _moveCameraSafely(LatLng(pickupLat!, pickupLng!), 16.0);
+      _animateCameraTo(LatLng(pickupLat!, pickupLng!), 16.0);
       return;
     }
 
@@ -412,12 +464,18 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
       final bounds = LatLngBounds.fromPoints(pointsToFrame);
 
-      final double bottomPixelPadding = (_phase == _BookingPhase.routeReady) ? 300.0 : 160.0;
+      double bottomPixelPadding = 200.0;
+      if (_sheetCtrl.isAttached) {
+        final screenHeight = MediaQuery.of(context).size.height;
+        bottomPixelPadding = (screenHeight * _sheetCtrl.size) + 40.0;
+      } else if (_phase == _BookingPhase.routeReady) {
+        bottomPixelPadding = 300.0;
+      }
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _isMapReady) {
-          _mapController.fitCamera(
-            CameraFit.bounds(
+          try {
+            final cameraFit = CameraFit.bounds(
               bounds: bounds,
               padding: EdgeInsets.only(
                 top: 100.0,
@@ -427,23 +485,35 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
               ),
               maxZoom: 17.0,
               minZoom: 11.0,
-            ),
-          );
+            );
+            final targetCenter = cameraFit.fit(_mapController.camera).center;
+            final targetZoom = cameraFit.fit(_mapController.camera).zoom;
+            _animateCameraTo(targetCenter, targetZoom);
+          } catch (_) {
+            _mapController.fitCamera(
+              CameraFit.bounds(
+                bounds: bounds,
+                padding: EdgeInsets.only(
+                  top: 100.0,
+                  bottom: bottomPixelPadding,
+                  left: 48.0,
+                  right: 48.0,
+                ),
+                maxZoom: 17.0,
+                minZoom: 11.0,
+              ),
+            );
+          }
         }
       });
     } catch (_) {
-      _moveCameraSafely(LatLng(dropLat!, dropLng!), 15.5);
+      _animateCameraTo(LatLng(dropLat!, dropLng!), 15.5);
     }
   }
 
   void _moveCameraSafely(LatLng center, double zoom) {
-    try {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _isMapReady) {
-          _mapController.move(center, zoom.clamp(4.0, 17.5));
-        }
-      });
-    } catch (_) {}
+    if (_isUserPanning) return;
+    _animateCameraTo(center, zoom);
   }
 
   void _clearPickupSelection() {
@@ -607,7 +677,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     });
 
     if (pickupLat != null && dropLat != null && pickupLat != 0.0 && dropLat != 0.0 && !_hasSamePickupAndDrop) {
-      _startRouteSequence();
+      _startRouteSequence(focusDrop: !isPickup);
     } else {
       _fitMapToRoute();
     }
@@ -631,7 +701,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         }
       });
       if (dropLat != null && dropLat != 0.0 && !_hasSamePickupAndDrop) {
-        _startRouteSequence();
+        _startRouteSequence(focusDrop: false);
       } else {
         _fitMapToRoute();
       }
@@ -652,9 +722,11 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         }
       });
       if (pickupLat != null && pickupLat != 0.0 && !_hasSamePickupAndDrop) {
-        _startRouteSequence();
+        _startRouteSequence(focusDrop: true);
       } else {
-        _fitMapToRoute();
+        if (dropLat != null && dropLng != null) {
+          _animateCameraTo(LatLng(dropLat!, dropLng!), 15.5);
+        }
       }
       _reverseGeocodeAndUpdate(point.latitude, point.longitude, isPickup: false, fallbackAddress: "Drop address from map");
     }
@@ -685,10 +757,8 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       }
     });
 
-    if (pickupLat != null && dropLat != null && pickupLat != 0.0 && dropLat != 0.0 && !_hasSamePickupAndDrop) {
-      _startRouteSequence();
-    } else {
-      _fitMapToRoute();
+    if (!isPickup && dropLat != null && dropLng != null && dropLat != 0.0 && dropLng != 0.0) {
+      _animateCameraTo(LatLng(dropLat!, dropLng!), 15.5);
     }
     _saveToPrefs();
   }
@@ -715,6 +785,8 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       });
       return;
     }
+    // DELAYED ROUTE FIT: Perform full route camera fit when confirming ride
+    _fitMapToRoute(force: true);
     setState(() {
       isLoading = true;
       message = "";
@@ -795,6 +867,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
   Widget _buildBody(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
+    final sheetOffset = _sheetCtrl.isAttached ? MediaQuery.of(context).size.height * _sheetCtrl.size : 220.0;
     return Stack(
       children: [
         _buildFullScreenMap(),
@@ -802,8 +875,40 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         Positioned(top: topPadding + 78, left: 16, right: 16, child: _buildFloatingLocationCard()),
         if (_phase == _BookingPhase.calculating)
           Positioned(bottom: MediaQuery.of(context).size.height * 0.25 + 8, left: 0, right: 0, child: Center(child: _buildCalculatingPill())),
+        if (_isUserPanning || _phase == _BookingPhase.routeReady)
+          Positioned(
+            bottom: sheetOffset + 16,
+            right: 16,
+            child: _buildRecenterButton(),
+          ),
         _buildDraggableSheet(context),
       ],
+    );
+  }
+
+  Widget _buildRecenterButton() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(30),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF141616).withOpacity(0.85),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withOpacity(0.15)),
+          ),
+          child: IconButton(
+            tooltip: "Recenter Map Focus",
+            icon: const Icon(Icons.my_location_rounded, color: Color(0xFFF4A261), size: 22),
+            onPressed: () {
+              setState(() {
+                _isUserPanning = false;
+              });
+              _fitMapToRoute(force: true);
+            },
+          ),
+        ),
+      ),
     );
   }
 
@@ -871,11 +976,23 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         minZoom: 11.0, 
         maxZoom: 18.0,
         onTap: (_, point) => _onMapTapped(point),
+        onPositionChanged: (position, hasGesture) {
+          if (hasGesture && !_isUserPanning) {
+            setState(() {
+              _isUserPanning = true;
+            });
+          }
+        },
         onMapReady: () {
           setState(() {
             _isMapReady = true;
           });
-          _fitMapToRoute();
+          if (_pendingFitOnMapReady) {
+            _pendingFitOnMapReady = false;
+            _fitMapToRoute(force: true);
+          } else {
+            _fitMapToRoute();
+          }
         },
       ),
       children: [
@@ -1403,6 +1520,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   }
 
   void _showNegotiationModal() {
+    _fitMapToRoute(force: true);
     final suggested = estimatedFare ?? 0.0;
     double offerAmount = double.tryParse(_offerController.text.trim()) ?? (suggested * 0.85);
 
