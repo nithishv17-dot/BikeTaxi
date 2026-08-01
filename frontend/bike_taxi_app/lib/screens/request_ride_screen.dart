@@ -408,12 +408,101 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     }
   }
 
+  LatLng? _getBestUserLocation() {
+    final lat = pickupLat ?? currentLat ?? lastKnownLat;
+    final lng = pickupLng ?? currentLng ?? lastKnownLng;
+    if (lat != null && lng != null && lat != 0.0 && lng != 0.0) {
+      return LatLng(lat, lng);
+    }
+    return null;
+  }
+
+  LatLng? _getNearestDriverLocation(LatLng userLoc) {
+    if (availableDrivers.isEmpty) return null;
+    LatLng? nearest;
+    double minDistance = double.infinity;
+
+    for (final driver in availableDrivers) {
+      if (driver["isAvailable"] != true) continue;
+      final loc = driver["location"];
+      if (loc == null) continue;
+      final double? dLat = loc["lat"] is num ? (loc["lat"] as num).toDouble() : double.tryParse("${loc["lat"]}");
+      final double? dLng = loc["lng"] is num ? (loc["lng"] as num).toDouble() : double.tryParse("${loc["lng"]}");
+      if (dLat == null || dLng == null || dLat == 0.0 || dLng == 0.0) continue;
+
+      final dist = (dLat - userLoc.latitude) * (dLat - userLoc.latitude) +
+          (dLng - userLoc.longitude) * (dLng - userLoc.longitude);
+      if (dist < minDistance) {
+        minDistance = dist;
+        nearest = LatLng(dLat, dLng);
+      }
+    }
+    return nearest;
+  }
+
+  void _fitUserAndDriverOrFocusUser({bool force = false}) {
+    if (!_isMapReady || !mounted) return;
+    if (_isUserPanning && !force) return;
+
+    final userLoc = _getBestUserLocation();
+    if (userLoc == null) return;
+
+    final driverLoc = _getNearestDriverLocation(userLoc);
+
+    if (driverLoc != null) {
+      // Driver location available: Smoothly fit User + Driver
+      try {
+        final bounds = LatLngBounds.fromPoints([userLoc, driverLoc]);
+
+        double bottomPixelPadding = 200.0;
+        if (_sheetCtrl.isAttached) {
+          final screenHeight = MediaQuery.of(context).size.height;
+          bottomPixelPadding = (screenHeight * _sheetCtrl.size) + 40.0;
+        } else if (_phase == _BookingPhase.routeReady) {
+          bottomPixelPadding = 300.0;
+        }
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _isMapReady) {
+            try {
+              final cameraFit = CameraFit.bounds(
+                bounds: bounds,
+                padding: EdgeInsets.only(
+                  top: 100.0,
+                  bottom: bottomPixelPadding,
+                  left: 48.0,
+                  right: 48.0,
+                ),
+                maxZoom: 16.5,
+                minZoom: 12.5,
+              );
+              final targetCenter = cameraFit.fit(_mapController.camera).center;
+              final targetZoom = cameraFit.fit(_mapController.camera).zoom;
+              _animateCameraTo(targetCenter, targetZoom);
+            } catch (_) {
+              _animateCameraTo(userLoc, 15.5);
+            }
+          }
+        });
+      } catch (_) {
+        _animateCameraTo(userLoc, 15.5);
+      }
+    } else {
+      // Driver location not available: Focus on User's current location at zoom 15.5
+      _animateCameraTo(userLoc, 15.5);
+    }
+  }
+
   Future<void> _startRouteSequence({bool focusDrop = true}) async {
     if (!mounted) return;
     if (_isSequenceRunning) return;
     _isSequenceRunning = true;
 
     try {
+      setState(() {
+        _phase = _BookingPhase.calculating;
+      });
+
       await _fetchRoadRoute();
 
       if (!mounted) return;
@@ -423,12 +512,8 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         _isUserPanning = false;
       });
 
-      // DELAYED ROUTE FIT: Focus on selected drop point when choosing destination
-      if (focusDrop && dropLat != null && dropLng != null && dropLat != 0.0 && dropLng != 0.0) {
-        _animateCameraTo(LatLng(dropLat!, dropLng!), 15.5);
-      } else {
-        _fitMapToRoute(force: true);
-      }
+      // Fit User + Driver bounds if driver exists, otherwise stay focused on User
+      _fitUserAndDriverOrFocusUser(force: true);
 
       if (_sheetCtrl.isAttached) {
         _sheetCtrl.animateTo(0.60, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
