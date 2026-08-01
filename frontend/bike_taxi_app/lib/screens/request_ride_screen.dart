@@ -493,7 +493,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     }
   }
 
-  Future<void> _startRouteSequence({bool focusDrop = true}) async {
+  Future<void> _startRouteSequence() async {
     if (!mounted) return;
     if (_isSequenceRunning) return;
     _isSequenceRunning = true;
@@ -809,9 +809,9 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     });
 
     if (pickupLat != null && dropLat != null && pickupLat != 0.0 && dropLat != 0.0 && !_hasSamePickupAndDrop) {
-      _startRouteSequence(focusDrop: !isPickup);
+      _startRouteSequence();
     } else {
-      _fitMapToRoute();
+      _fitUserAndDriverOrFocusUser(force: true);
     }
     _saveToPrefs();
   }
@@ -833,9 +833,9 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         }
       });
       if (dropLat != null && dropLat != 0.0 && !_hasSamePickupAndDrop) {
-        _startRouteSequence(focusDrop: false);
+        _startRouteSequence();
       } else {
-        _fitMapToRoute();
+        _fitUserAndDriverOrFocusUser(force: true);
       }
       _reverseGeocodeAndUpdate(point.latitude, point.longitude, isPickup: true, fallbackAddress: "Pickup address from map");
     } else {
@@ -854,11 +854,9 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         }
       });
       if (pickupLat != null && pickupLat != 0.0 && !_hasSamePickupAndDrop) {
-        _startRouteSequence(focusDrop: true);
+        _startRouteSequence();
       } else {
-        if (dropLat != null && dropLng != null) {
-          _animateCameraTo(LatLng(dropLat!, dropLng!), 15.5);
-        }
+        _fitUserAndDriverOrFocusUser(force: true);
       }
       _reverseGeocodeAndUpdate(point.latitude, point.longitude, isPickup: false, fallbackAddress: "Drop address from map");
     }
@@ -888,10 +886,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         dropError = null;
       }
     });
-
-    if (!isPickup && dropLat != null && dropLng != null && dropLat != 0.0 && dropLng != 0.0) {
-      _animateCameraTo(LatLng(dropLat!, dropLng!), 15.5);
-    }
     _saveToPrefs();
   }
 
