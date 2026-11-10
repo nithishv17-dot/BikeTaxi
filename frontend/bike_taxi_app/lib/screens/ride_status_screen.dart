@@ -58,17 +58,18 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       if (!mounted) return;
       try {
         final pos = await LocationService.getBestCurrentLocation(
-          context: context,
           timeout: const Duration(seconds: 3),
           allowFallback: true,
         );
-        if (pos != null && mounted) {
+        if (pos != null && pos['lat'] != null && pos['lng'] != null && mounted) {
+          final lat = pos['lat']!;
+          final lng = pos['lng']!;
           if (widget.isDriver) {
             final session = SessionService.loadSession();
             final driverId = session?["userId"] ?? "";
-            SocketService.emitUpdateDriverLocation(widget.rideId, driverId, pos.latitude, pos.longitude);
+            SocketService.emitUpdateDriverLocation(widget.rideId, driverId, lat, lng);
           } else {
-            SocketService.emitUpdateRiderLocation(widget.rideId, pos.latitude, pos.longitude);
+            SocketService.emitUpdateRiderLocation(widget.rideId, lat, lng);
           }
         }
       } catch (_) {}
