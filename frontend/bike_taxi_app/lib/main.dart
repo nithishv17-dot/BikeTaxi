@@ -66,6 +66,10 @@ final GoRouter _router = GoRouter(
       },
     ),
     GoRoute(
+      path: '/captain-home',
+      redirect: (context, state) => '/driver',
+    ),
+    GoRoute(
       path: '/ride-status/:rideId',
       builder: (context, state) {
         final session = SessionService.loadSession();
