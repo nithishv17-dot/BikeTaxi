@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RideGo - Move Fast</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-on-surface": "#2f3131",
+                    "surface-container": "#1e2020",
+                    "on-tertiary-fixed-variant": "#004c69",
+                    "surface-container-low": "#1a1c1c",
+                    "surface-bright": "#37393a",
+                    "on-secondary-fixed-variant": "#474646",
+                    "primary-fixed-dim": "#ffb77d",
+                    "secondary": "#c8c6c5",
+                    "on-tertiary-container": "#00435d",
+                    "tertiary-fixed-dim": "#7ad0ff",
+                    "inverse-primary": "#904d00",
+                    "on-surface": "#e2e2e2",
+                    "on-tertiary": "#003549",
+                    "surface": "#121414",
+                    "tertiary-fixed": "#c3e8ff",
+                    "outline-variant": "#564334",
+                    "on-primary-container": "#623200",
+                    "on-secondary": "#313030",
+                    "on-primary-fixed": "#2f1500",
+                    "on-primary-fixed-variant": "#6e3900",
+                    "secondary-container": "#4a4949",
+                    "secondary-fixed-dim": "#c8c6c5",
+                    "primary-fixed": "#ffdcc3",
+                    "error-container": "#93000a",
+                    "on-tertiary-fixed": "#001e2c",
+                    "surface-container-highest": "#333535",
+                    "surface-dim": "#121414",
+                    "on-error": "#690005",
+                    "error": "#ffb4ab",
+                    "primary": "#ffb77d",
+                    "background": "#121414",
+                    "on-background": "#e2e2e2",
+                    "tertiary": "#7ad0ff",
+                    "outline": "#a48c7a",
+                    "primary-container": "#ff8c00",
+                    "on-secondary-fixed": "#1c1b1b",
+                    "surface-container-lowest": "#0c0f0f",
+                    "on-secondary-container": "#bab8b7",
+                    "surface-tint": "#ffb77d",
+                    "on-primary": "#4d2600",
+                    "on-surface-variant": "#ddc1ae",
+                    "surface-variant": "#333535",
+                    "surface-container-high": "#282a2b",
+                    "inverse-surface": "#e2e2e2",
+                    "on-error-container": "#ffdad6",
+                    "tertiary-container": "#00b6f3",
+                    "secondary-fixed": "#e5e2e1"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin-desktop": "40px",
+                    "sm": "16px",
+                    "md": "24px",
+                    "lg": "32px",
+                    "gutter": "16px",
+                    "margin-mobile": "20px",
+                    "base": "4px",
+                    "xs": "8px",
+                    "xl": "48px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Be Vietnam Pro"],
+                    "title-md": ["Be Vietnam Pro"],
+                    "headline-lg-mobile": ["Be Vietnam Pro"],
+                    "headline-lg": ["Be Vietnam Pro"],
+                    "display-lg": ["Be Vietnam Pro"],
+                    "body-sm": ["Be Vietnam Pro"],
+                    "label-caps": ["Be Vietnam Pro"]
+            },
+            "fontSize": {
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-level-2 {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glass-level-3 {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(40px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .primary-action-glow {
+            box-shadow: 0 0 20px rgba(255, 140, 0, 0.4);
+        }
+        .map-gradient-overlay {
+            background: linear-gradient(to bottom, rgba(18, 20, 20, 0.8) 0%, rgba(18, 20, 20, 0) 20%, rgba(18, 20, 20, 0) 80%, rgba(18, 20, 20, 0.9) 100%);
+        }
+        .pulse-blue {
+            animation: pulse-blue 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-blue {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .7; transform: scale(1.1); }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body-lg overflow-hidden h-screen w-full">
+<!-- Persistent Map Layer -->
+<div class="fixed inset-0 z-0">
+<img alt="Map view of city streets" class="w-full h-full object-cover opacity-60 grayscale-[0.5] contrast-[1.1]" data-location="New York City" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAcIaGfUpSMOXb5VwqPacX1TB2vhGWYE3jtC6CbkffTg2aP74XHMJaeKKycESasJEcUSqFcdSxSTIkHqQkL7GromUL-KCENg-WsGD9TVd5i5K0c-VFuYBZjO0ALWfXcsPelld4Fhv6qaINOhkBIY2enK-9_SNQwFfGmRVhCLJFETK1cXF2cn-h2hAWL4mc4wQ2yBsgI1hDxMx9KxzEfzHTjJhs1b5iCpgyjBqyCzEb0G0uxjeIfEVZLF6mHzLjBEbfCvJaaIIr6nFc"/>
+<div class="absolute inset-0 map-gradient-overlay pointer-events-none"></div>
+<!-- Animated AI Route Line (Simulated) -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" viewbox="0 0 400 800">
+<path class="pulse-blue" d="M200,600 Q250,500 150,400 T200,200" fill="none" stroke="#7ad0ff" stroke-dasharray="8 8" stroke-width="4">
+<animate attributename="stroke-dashoffset" dur="3s" from="100" repeatcount="indefinite" to="0"></animate>
+</path>
+</svg>
+<!-- Dynamic Bike Markers -->
+<div class="absolute top-[30%] left-[40%] flex items-center justify-center">
+<div class="bg-primary-container p-1 rounded-full shadow-lg">
+<span class="material-symbols-outlined text-on-primary-container text-[20px]">two_wheeler</span>
+</div>
+</div>
+<div class="absolute top-[45%] right-[25%] flex items-center justify-center">
+<div class="bg-primary-container p-1 rounded-full shadow-lg opacity-80">
+<span class="material-symbols-outlined text-on-primary-container text-[18px]">two_wheeler</span>
+</div>
+</div>
+</div>
+<!-- Top App Bar (Shared Component Strategy) -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-margin-mobile h-16 backdrop-blur-md border-b border-white/10 bg-white/5">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary text-title-md active:scale-95 transition-transform">menu</button>
+<h1 class="font-display-lg text-[24px] font-extrabold text-primary tracking-tight">RideGo</h1>
+</div>
+<div class="w-10 h-10 rounded-full overflow-hidden border border-primary/30">
+<img alt="User profile avatar" class="w-full h-full object-cover" data-alt="A professional headshot of a young male user for a profile avatar. The lighting is soft and studio-quality, emphasizing clear skin and a friendly expression. The background is a minimalist, dark grey, aligning with a high-end tech aesthetic. The overall style is modern, polished, and suitable for a premium application user interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVh2Hq7gX-1wwoPjUl-TJwlzPstoLyp4WLwAujPI0V737yxlZRVr0snq_n8IN446yRL4iU3y9H3Pab41A3vTmarajAMGCULJJtrScTHdYjmDwtjouCrIYyoMJkOrphsinC3EVpzNEc1DbR5hfJQK4frBE7UYhJpQNbB_YFlJBbnb1kD1_ARLAT7yXuDsfHKPZzNTnbDj1wv9xpQWtU6einSIg0jYAf2RfLUGE6FnmUPbeyQR4zeRwqE8beOxrmQXXdySdvdyhiPzk"/>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="relative z-10 pt-20 px-margin-mobile flex flex-col h-full pointer-events-none">
+<!-- Top Search Bar -->
+<section class="w-full max-w-lg mx-auto pointer-events-auto">
+<div class="glass-level-3 rounded-xl p-xs flex items-center shadow-xl">
+<div class="flex items-center gap-3 w-full bg-surface-container-lowest/40 rounded-lg px-4 py-3 border border-white/5 focus-within:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary">search</span>
+<input class="bg-transparent border-none text-on-surface placeholder:text-on-surface-variant focus:ring-0 w-full font-body-lg" placeholder="Where to?" type="text"/>
+<div class="h-6 w-[1px] bg-white/10"></div>
+<span class="material-symbols-outlined text-tertiary">my_location</span>
+</div>
+</div>
+<!-- AI Badge -->
+<div class="mt-4 flex justify-center">
+<div class="glass-level-2 px-3 py-1.5 rounded-full flex items-center gap-2 border border-tertiary/30 animate-pulse">
+<span class="material-symbols-outlined text-tertiary text-sm" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="text-label-caps text-tertiary">Fastest Route: AI Optimized</span>
+</div>
+</div>
+</section>
+<!-- Spacer for Map View -->
+<div class="flex-grow"></div>
+<!-- Bottom Ride Sheet -->
+<section class="pointer-events-auto w-full max-w-lg mx-auto mb-32">
+<div class="glass-level-3 rounded-t-[32px] p-6 pb-10 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
+<!-- Sheet Handle -->
+<div class="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6"></div>
+<div class="flex justify-between items-center mb-6">
+<h2 class="font-title-md text-on-surface">Nearby Captains</h2>
+<span class="text-label-caps text-on-surface-variant">4 Min Away</span>
+</div>
+<!-- Captains Grid -->
+<div class="grid grid-cols-2 gap-4 mb-8">
+<!-- Bike Selection Card -->
+<button class="glass-level-2 p-4 rounded-xl border-primary/50 relative overflow-hidden group active:scale-95 transition-all text-left">
+<div class="absolute top-0 right-0 p-2">
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<span class="material-symbols-outlined text-primary mb-2 text-3xl">two_wheeler</span>
+<div class="font-title-md text-on-surface text-base">Standard</div>
+<div class="text-body-sm text-on-surface-variant">$4.20</div>
+<div class="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</button>
+<button class="glass-level-2 p-4 rounded-xl border-white/5 opacity-60 relative overflow-hidden group active:scale-95 transition-all text-left">
+<span class="material-symbols-outlined text-on-surface-variant mb-2 text-3xl">electric_moped</span>
+<div class="font-title-md text-on-surface text-base">Eco-Electric</div>
+<div class="text-body-sm text-on-surface-variant">$5.50</div>
+</button>
+</div>
+<!-- Action Button -->
+<button class="w-full bg-primary-container text-on-primary-fixed font-bold py-4 rounded-xl text-title-md primary-action-glow hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-3">
+                    Ride Now
+                    <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Bar (Shared Component Strategy) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 backdrop-blur-[40px] border-t border-white/20 bg-white/12 rounded-t-xl shadow-[0_-4px_20px_rgba(255,255,255,0.05)] md:hidden">
+<a class="flex flex-col items-center justify-center text-primary font-bold transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-caps text-label-caps">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary-fixed-dim hover:text-primary-fixed-dim transition-all duration-200" href="#">
+<span class="material-symbols-outlined">two_wheeler</span>
+<span class="font-label-caps text-label-caps">Rides</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary-fixed-dim hover:text-primary-fixed-dim transition-all duration-200" href="#">
+<span class="material-symbols-outlined">verified_user</span>
+<span class="font-label-caps text-label-caps">Safety</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary-fixed-dim hover:text-primary-fixed-dim transition-all duration-200" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-caps text-label-caps">Profile</span>
+</a>
+</nav>
+<!-- FAB Suppression Applied: No FAB on primary home screen per guidelines unless aligned perfectly with action -->
+<script>
+        // Micro-interactions for glassmorphism movement
+        document.addEventListener('mousemove', (e) => {
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            
+            const sheets = document.querySelectorAll('.glass-level-3');
+            sheets.forEach(sheet => {
+                const offsetX = (x - 0.5) * 10;
+                const offsetY = (y - 0.5) * 10;
+                sheet.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0)`;
+            });
+        });
+
+        // Toggle simple active states for bike selection
+        const bikeCards = document.querySelectorAll('.grid button');
+        bikeCards.forEach(card => {
+            card.addEventListener('click', () => {
+                bikeCards.forEach(c => {
+                    c.classList.remove('border-primary/50');
+                    c.classList.add('border-white/5');
+                    c.classList.add('opacity-60');
+                    const icon = c.querySelector('.absolute.top-0');
+                    if(icon) icon.remove();
+                });
+                card.classList.add('border-primary/50');
+                card.classList.remove('border-white/5');
+                card.classList.remove('opacity-60');
+                
+                const check = document.createElement('div');
+                check.className = 'absolute top-0 right-0 p-2';
+                check.innerHTML = '<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: \'FILL\' 1;">check_circle</span>';
+                card.appendChild(check);
+            });
+        });
+    </script>
+</body></html>

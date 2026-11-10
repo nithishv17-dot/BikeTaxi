@@ -1,0 +1,256 @@
+Act as a Senior Flutter Engineer specializing in high-performance map applications.
+
+Implement the transition between the "Location Input" state and the "Route Ready" state on the SAME screen.
+
+Do not navigate to another page.
+
+The animation should feel premium, fluid, and comparable to modern ride-hailing applications.
+
+--------------------------------------------------
+INITIAL STATE
+--------------------------------------------------
+
+The screen contains:
+
+• Full-screen interactive map
+• Floating Pickup / Drop location card
+• Draggable bottom sheet collapsed to approximately 30% of the screen
+• Only the Booking Mode selector (Normal / Negotiation) is visible
+
+Do NOT display:
+
+• Fare
+• ETA
+• Distance
+• Payment Method
+• Book Ride button
+• Ride Type
+
+The map contains no route.
+
+--------------------------------------------------
+TRIGGER
+--------------------------------------------------
+
+The transition begins immediately after the user selects or confirms the Drop Location.
+
+--------------------------------------------------
+ANIMATION SEQUENCE
+--------------------------------------------------
+
+Stage 1 — Route Calculation
+
+• Start calculating the best available route.
+• Keep the existing UI unchanged.
+• Do not rebuild or replace the screen.
+• Keep the bottom sheet collapsed.
+• Keep the floating location card fully opaque.
+
+If route calculation takes time, display only a subtle loading indicator.
+
+--------------------------------------------------
+
+Stage 2 — Route Animation
+
+When the route is received:
+
+• Animate the route polyline from Pickup to Destination.
+• Fade in the pickup marker.
+• Fade in the destination marker.
+• Smoothly animate the map camera to fit the complete route.
+• Avoid sudden jumps.
+
+The route should become the primary visual focus.
+
+--------------------------------------------------
+
+Stage 3 — Floating Card Transition
+
+After the route is visible:
+
+Animate the Pickup / Drop card.
+
+Only animate its background.
+
+Transition:
+
+• Background opacity:
+100% → 75%
+
+• Apply backdrop blur.
+
+Preserve:
+
+• Position
+• Size
+• Layout
+
+The text must remain fully opaque.
+
+The location fields remain editable.
+
+The estimated route should now be partially visible underneath the floating card.
+
+--------------------------------------------------
+
+Stage 4 — Bottom Sheet Expansion
+
+Only after the route animation completes:
+
+Automatically expand the draggable bottom sheet.
+
+Expand:
+
+30%
+↓
+
+60%
+
+Animation:
+
+• Spring animation
+• Duration approximately 350–450ms
+
+As the sheet expands, progressively reveal:
+
+• Booking Mode
+• Ride Type
+• Estimated Fare
+• ETA
+• Distance
+• Payment Method
+• Book Ride button
+
+Use staggered fade-in and slide-up animations for newly revealed content.
+
+Do not replace the bottom sheet.
+
+Reveal additional content inside the existing sheet.
+
+--------------------------------------------------
+
+Stage 5 — Manual Interaction
+
+After the automatic expansion finishes:
+
+Stop all automatic animations.
+
+The user now has full control.
+
+Support three snap positions:
+
+• 30% — Collapsed
+• 60% — Booking Ready
+• 90% — Fully Expanded
+
+The sheet must remain draggable.
+
+Do not automatically expand again unless the route changes.
+
+--------------------------------------------------
+LOCATION CHANGES
+--------------------------------------------------
+
+If the Pickup or Drop location changes:
+
+• Collapse the sheet back to 30%.
+• Remove the existing route.
+• Restore the location card to full opacity.
+• Recalculate the route.
+• Replay the entire animation sequence.
+
+--------------------------------------------------
+FLUTTER IMPLEMENTATION
+--------------------------------------------------
+
+Use Flutter animation APIs.
+
+Prefer:
+
+• AnimationController
+• CurvedAnimation
+• AnimatedContainer
+• AnimatedOpacity
+• TweenAnimationBuilder
+• AnimatedSwitcher
+• DraggableScrollableSheet
+• AnimatedBuilder
+
+Use the map SDK's camera animation APIs instead of recreating the map widget.
+
+Update only the route overlay and markers when the route changes.
+
+Avoid rebuilding the entire widget tree.
+
+--------------------------------------------------
+MOTION PRINCIPLES
+--------------------------------------------------
+
+This is a state transition, not a page transition.
+
+Every UI component should smoothly animate into its next state.
+
+Nothing should abruptly appear or disappear.
+
+The perceived flow should be:
+
+Destination Selected
+
+↓
+
+Route Calculated
+
+↓
+
+Route Drawn
+
+↓
+
+Floating Card Becomes Glass
+
+↓
+
+Bottom Sheet Expands
+
+↓
+
+User Takes Full Control
+
+The final experience should feel calm, polished, responsive, and premium while maintaining smooth 60 FPS performance.
+
+
+## Stitch Instructions
+
+Get the images and code for the following Stitch project's screens:
+
+## Project
+Title: Transparent Map Location Selector
+ID: 15821388134030740427
+
+## Screens:
+1. Screen 1
+    ID: f5318b0186e74a849c54274dedba3a02
+
+2. screen 3
+    ID: 8936e016102b40a6b461a88797e941f7
+
+3. screen 2
+    ID: 2eb568cc1e4847b08fd221f0e2f61170
+
+4. screen 4
+    ID: 2623ae8d8dc546dc95630e2eff050526
+
+5. screen 5
+    ID: 002a681087974090988ee15f316c2c64
+
+Use a utility like `curl -L` to download the hosted URLs.
+
+GitHub Copilot: I'll search the Flutter frontend for the map/location screen and related widgets.
+
+Searched for text `map|Location|location|pickup|drop|DraggableScrollableSheet|Route|polyline|GoogleMap|MapBox|flutter_map` (`**/frontend/bike_taxi_app/**`), 83 results
+
+Now I'll search specifically inside `lib` for pickup/drop, map widget, and bottom sheet usage.
+
+Searched for text `pickup|drop|pickup|Drop|DraggableScrollableSheet|floating|location card|Location Input|route|polyline|flutter_map|GoogleMap` (`**/BikeTaxi/frontend/bike_taxi_app/lib/**`), 78 results
+
+I'll open `lib/screens/home_screen.dart` to inspect the main UI and find the map and bottom sheet.Listing the `lib/screens` directory to locate screen files.

@@ -1,0 +1,204 @@
+Act as a Senior Staff Product Designer and Senior Flutter UI Engineer specializing in premium mobility applications (Uber, Lyft, Apple Maps, Google Maps). Refine the existing Home Booking screen UI while preserving the current dark premium design language. Do not redesign the overall experience or alter business logic. Focus only on improving spacing, hierarchy, proportions, visual polish, and production-level usability.
+
+The final interface should feel compact, elegant, premium, and production-ready rather than like an oversized prototype. Maintain the existing dark theme, glassmorphism, rounded corners, smooth animations, and map-first experience.
+
+==================================================
+FLOATING BRAND HEADER
+==================================================
+
+Replace the existing full-width AppBar with a premium floating glass header.
+
+Requirements:
+
+• Remove the traditional AppBar completely.
+• Create a floating rounded rectangle centered horizontally at the top.
+• Respect the device SafeArea.
+• Keep the map visible around and beneath the header.
+• Horizontal margin: 16–20px.
+• Height: 56–64px.
+• Border radius: 20–24px.
+• Dark glass background with approximately 70–80% opacity.
+• Apply a real backdrop blur (glassmorphism).
+• Add a subtle 1px semi-transparent border.
+• Add a soft shadow for depth.
+• Keep the header fixed while interacting with the map.
+
+Branding:
+
+Display only:
+
+Dot Taxi
+
+• Center horizontally and vertically.
+• SemiBold/Bold typography.
+• Font size: 24–28px.
+• White text.
+• Slight positive letter spacing for a premium appearance.
+
+Maintain approximately 8–12px spacing between the floating header and the Pickup/Drop card.
+
+The header should resemble a premium floating navigation panel instead of a traditional navigation bar.
+
+==================================================
+PICKUP & DROP LOCATION CARD
+==================================================
+
+Keep the existing floating location card while refining its proportions.
+
+Requirements:
+
+• Reduce unnecessary internal spacing.
+• Remove excessive empty vertical space.
+• Preserve premium rounded corners.
+• Preserve dark glass styling.
+• Maintain clear separation between Pickup and Drop inputs.
+• Improve vertical balance without making the component feel cramped.
+
+The component should become denser while remaining highly readable.
+
+==================================================
+PICKUP & DROP INPUT FIELDS
+==================================================
+
+Improve both Pickup and Drop input fields.
+
+Current issue:
+
+Placeholder and typed text sit too close to the field borders.
+
+Requirements:
+
+• Increase spacing between icon and text.
+• Increase horizontal padding.
+• Increase vertical padding.
+• Maintain 16–20px internal padding on all sides.
+• Vertically center placeholder text.
+• Typed text must follow identical alignment.
+• Prevent text from touching rounded edges.
+• Improve overall text alignment.
+• Preserve current typography and color palette.
+
+The inputs should feel spacious, premium, and effortless to read.
+
+==================================================
+CURRENT LOCATION SUGGESTION
+==================================================
+
+Redesign the Current Location suggestion into a compact suggestion tile.
+
+Target height:
+
+48–56px.
+
+Display:
+
+📍 Current Location
+
+Use Live GPS Location
+
+Requirements:
+
+• Reduce overall height.
+• Reduce vertical padding.
+• Smaller icon container.
+• Smaller icon.
+• Reduce spacing between icon and text.
+• Subtitle uses smaller secondary typography.
+• Slightly reduce border radius.
+• Maintain consistent spacing with other search suggestions.
+• Preserve premium dark appearance.
+
+The tile should resemble a lightweight search suggestion instead of a large information card.
+
+==================================================
+COLLAPSED BOOKING PANEL
+==================================================
+
+Refine the collapsed bottom sheet.
+
+Current issue:
+
+Excessive empty vertical space.
+
+Requirements:
+
+Collapsed state should only display:
+
+• Drag Handle
+• Booking Mode title
+• Normal / Negotiation segmented control
+
+Reduce collapsed height to approximately 20–25% of the screen.
+
+Requirements:
+
+• Remove unnecessary empty padding.
+• Center the segmented control vertically.
+• Increase segmented control width.
+• Maintain generous horizontal margins.
+• Preserve premium rounded corners.
+• Keep smooth bottom-sheet animations.
+• Ensure the panel feels compact while remaining touch-friendly.
+
+==================================================
+BOOKING MODE
+==================================================
+
+Retain the segmented control.
+
+Requirements:
+
+• "Normal" selected by default.
+• Smooth animated selection transition.
+• Premium pill-style indicator.
+• Do NOT replace with a switch.
+• Maintain excellent touch targets.
+• Preserve current functionality.
+
+==================================================
+GLOBAL SPACING
+==================================================
+
+Audit the entire Home Booking screen.
+
+Adopt a strict 8-point spacing system.
+
+Requirements:
+
+• Remove oversized padding.
+• Eliminate unnecessary whitespace.
+• Improve alignment.
+• Balance visual density.
+• Keep all touch targets accessible.
+• Maintain readability.
+• Increase information density without making the interface feel crowded.
+
+Every element should have intentional spacing.
+
+==================================================
+DESIGN LANGUAGE
+==================================================
+
+Preserve the existing premium dark visual identity.
+
+Maintain:
+
+• Dark glassmorphism
+• Soft elevation
+• Thin translucent borders
+• Premium rounded corners
+• Elegant typography
+• Smooth micro-interactions
+• High-quality animations
+• Refined spacing
+• Consistent component sizing
+
+Do not introduce bright colors or redesign the theme.
+
+==================================================
+FINAL DESIGN GOAL
+==================================================
+
+The finished screen should look indistinguishable from a production-ready ride-hailing application. The layout should feel inspired by Uber, Apple Maps, Google Maps, and Lyft, emphasizing a map-first experience, premium glassmorphism, compact layouts, refined spacing, polished typography, balanced visual hierarchy, and smooth interactions.
+
+The objective is not to create a new UI, but to elevate the existing interface into a world-class, production-quality Home Booking screen with premium spacing, proportions, and visual refinement.

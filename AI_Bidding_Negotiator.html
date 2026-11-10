@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RideGo | AI Bidding Interface</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-sheet {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(40px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glow-orange {
+            box-shadow: 0 0 20px rgba(255, 140, 0, 0.3);
+        }
+        .glow-blue {
+            box-shadow: 0 0 15px rgba(122, 208, 255, 0.4);
+        }
+        @keyframes pulse-subtle {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(0.98); }
+        }
+        .animate-pulse-subtle {
+            animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        .progress-gradient {
+            background: linear-gradient(90deg, #7ad0ff 0%, #ff8c00 100%);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "inverse-on-surface": "#2f3131",
+                      "surface-container": "#1e2020",
+                      "on-tertiary-fixed-variant": "#004c69",
+                      "surface-container-low": "#1a1c1c",
+                      "surface-bright": "#37393a",
+                      "on-secondary-fixed-variant": "#474646",
+                      "primary-fixed-dim": "#ffb77d",
+                      "secondary": "#c8c6c5",
+                      "on-tertiary-container": "#00435d",
+                      "tertiary-fixed-dim": "#7ad0ff",
+                      "inverse-primary": "#904d00",
+                      "on-surface": "#e2e2e2",
+                      "on-tertiary": "#003549",
+                      "surface": "#121414",
+                      "tertiary-fixed": "#c3e8ff",
+                      "outline-variant": "#564334",
+                      "on-primary-container": "#623200",
+                      "on-secondary": "#313030",
+                      "on-primary-fixed": "#2f1500",
+                      "on-primary-fixed-variant": "#6e3900",
+                      "secondary-container": "#4a4949",
+                      "secondary-fixed-dim": "#c8c6c5",
+                      "primary-fixed": "#ffdcc3",
+                      "error-container": "#93000a",
+                      "on-tertiary-fixed": "#001e2c",
+                      "surface-container-highest": "#333535",
+                      "surface-dim": "#121414",
+                      "on-error": "#690005",
+                      "error": "#ffb4ab",
+                      "primary": "#ffb77d",
+                      "background": "#121414",
+                      "on-background": "#e2e2e2",
+                      "tertiary": "#7ad0ff",
+                      "outline": "#a48c7a",
+                      "primary-container": "#ff8c00",
+                      "on-secondary-fixed": "#1c1b1b",
+                      "surface-container-lowest": "#0c0f0f",
+                      "on-secondary-container": "#bab8b7",
+                      "surface-tint": "#ffb77d",
+                      "on-primary": "#4d2600",
+                      "on-surface-variant": "#ddc1ae",
+                      "surface-variant": "#333535",
+                      "surface-container-high": "#282a2b",
+                      "inverse-surface": "#e2e2e2",
+                      "on-error-container": "#ffdad6",
+                      "tertiary-container": "#00b6f3",
+                      "secondary-fixed": "#e5e2e1"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "margin-desktop": "40px",
+                      "sm": "16px",
+                      "md": "24px",
+                      "lg": "32px",
+                      "gutter": "16px",
+                      "margin-mobile": "20px",
+                      "base": "4px",
+                      "xs": "8px",
+                      "xl": "48px"
+              },
+              "fontFamily": {
+                      "body-lg": ["Be Vietnam Pro"],
+                      "title-md": ["Be Vietnam Pro"],
+                      "headline-lg-mobile": ["Be Vietnam Pro"],
+                      "headline-lg": ["Be Vietnam Pro"],
+                      "display-lg": ["Be Vietnam Pro"],
+                      "body-sm": ["Be Vietnam Pro"],
+                      "label-caps": ["Be Vietnam Pro"]
+              },
+              "fontSize": {
+                      "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                      "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                      "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-lg min-h-screen overflow-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- Persistent Map Layer -->
+<div class="fixed inset-0 z-0 overflow-hidden grayscale contrast-125 opacity-40">
+<img class="w-full h-full object-cover" data-alt="A dark, high-contrast urban street map of a bustling city at night viewed from an aerial perspective. The streets are illuminated with thin, glowing lines of light, primarily in cool electric blue and stark white, creating a futuristic, cyber-grid aesthetic. The overall mood is mysterious and high-tech, fitting for a modern ride-hailing application background." data-location="New York City" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7_fA5BU7i_TT4FPBV4ssvR7zo7CvzWnHT-e7T9mLlk027vvF-nZ5jeTR_r16jwoMJdOMQWLXOhWdwd4Gnw4KNPwjV4IcwS8HtY6zVp0RGowIpSkGJ2i1Ixi3QYV4bluKRL3oMxtURCWCNdECQzNMwAaISvEqIFJqA_Dx14tWsdh-yHOdLkGVrZxKSLUZyIDQjME0am8aeW1ycNweHauIkXfvDxzu199VO4r9jQJiWFSVX571Sn-ernWz587INOnJs91mxJytYNOw"/>
+</div>
+<!-- Top App Bar (Shared Component Execution) -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-margin-mobile h-16 bg-white/5 dark:bg-white/5 backdrop-blur-md border-b border-white/10 shadow-sm">
+<div class="flex items-center gap-4">
+<button class="active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-primary text-2xl">menu</span>
+</button>
+<h1 class="font-display-lg text-title-md font-extrabold text-primary">RideGo</h1>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex flex-col items-end hidden md:flex">
+<span class="font-label-caps text-on-surface-variant">Current Status</span>
+<span class="text-tertiary font-bold text-sm flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
+                    Negotiating
+                </span>
+</div>
+<div class="w-10 h-10 rounded-full border-2 border-primary/30 p-0.5">
+<img alt="User profile avatar" class="w-full h-full rounded-full object-cover" data-alt="A close-up portrait of a stylish modern man with a confident expression, set against a blurred urban background with neon lights. The lighting is dramatic, highlighting sharp features and a clean-cut look, maintaining the high-tech, premium aesthetic of the brand with hints of orange and blue tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGgMPqG1IKRv-KDq2EV68qaD1NBynahZbx10_Z0z-Ay14pxuxbexjdE0eWBfe7jxiLmncJNIwuDuo2YPErSczX15XrKgZLjHIVEMw944f8qdW4F_rq9WFmv6uGuNKfkryGCN33Y0Mocb0zCdb4gPGHV2H1hzBNGK8-Cv9qlyReqbGXN9FvVuTl8EsWu_jyzQV6DqMvQuDAhR3XkuK-wz_wzGALGXKxI8xy199pU0wYiHhgen1QwoF21TXw2SG7pATfi9awDe1ZBhQ"/>
+</div>
+</div>
+</header>
+<!-- Main Content Area: AI Bidding Interface -->
+<main class="relative z-10 pt-16 pb-24 h-screen flex flex-col justify-end px-margin-mobile md:px-margin-desktop overflow-y-auto">
+<!-- Animated Background Decoration -->
+<div class="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none overflow-hidden">
+<div class="absolute bottom-[-10%] left-[-10%] w-full h-full bg-gradient-to-tr from-primary/10 via-transparent to-transparent rounded-full blur-[120px]"></div>
+</div>
+<div class="max-w-md mx-auto w-full flex flex-col gap-sm pb-8">
+<!-- AI Recommendation Card -->
+<div class="glass-sheet rounded-xl p-md glow-orange relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-3">
+<span class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-tertiary/10 border border-tertiary/20 text-tertiary font-label-caps text-[10px] uppercase tracking-widest animate-pulse-subtle">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+                        AI Recommended
+                    </span>
+</div>
+<div class="mt-4 flex flex-col items-center text-center">
+<p class="font-label-caps text-on-surface-variant mb-base">Estimated Fair</p>
+<div class="flex items-baseline gap-1 text-on-background">
+<span class="text-3xl font-bold">$</span>
+<span class="text-6xl font-black tracking-tighter" id="fare-display">4.50</span>
+</div>
+<p class="font-body-sm text-on-surface-variant mt-2 max-w-[200px]">
+                        Optimized for <span class="text-primary font-bold">Fast Match</span> and Captain satisfaction.
+                    </p>
+</div>
+<!-- Negotiation Heat Map / Pulse -->
+<div class="mt-md space-y-xs">
+<div class="flex justify-between items-center font-label-caps text-[10px] text-on-surface-variant uppercase">
+<span>Captain Interest</span>
+<span class="text-primary font-bold" id="heat-label">High (92%)</span>
+</div>
+<div class="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
+<div class="h-full progress-gradient transition-all duration-1000 ease-in-out" id="heat-progress" style="width: 92%"></div>
+</div>
+</div>
+</div>
+<!-- Interaction Controls -->
+<div class="grid grid-cols-2 gap-sm">
+<button class="glass-card flex flex-col items-center justify-center p-sm rounded-xl active:scale-95 transition-all hover:bg-white/10 group" onclick="updateFare(-0.25)">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">remove_circle</span>
+<span class="font-label-caps text-[10px] mt-1 text-on-surface-variant uppercase">Bid Lower</span>
+</button>
+<button class="glass-card flex flex-col items-center justify-center p-sm rounded-xl active:scale-95 transition-all hover:bg-white/10 group" onclick="updateFare(0.25)">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">add_circle</span>
+<span class="font-label-caps text-[10px] mt-1 text-on-surface-variant uppercase">Bid Higher</span>
+</button>
+</div>
+<!-- Primary CTA -->
+<button class="w-full h-xl bg-primary-container text-on-primary-container font-headline-lg-mobile rounded-xl shadow-lg active:scale-[0.98] transition-all transform flex items-center justify-center gap-2 hover:brightness-110">
+                Accept Recommended
+                <span class="material-symbols-outlined">bolt</span>
+</button>
+<!-- Safety & Captain Status Chips -->
+<div class="flex flex-wrap justify-center gap-xs mt-2">
+<div class="px-3 py-1.5 rounded-full glass-card flex items-center gap-1.5 glow-blue border-tertiary/20">
+<span class="material-symbols-outlined text-tertiary text-sm" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="font-label-caps text-[10px] text-on-surface">Safe Ride Verified</span>
+</div>
+<div class="px-3 py-1.5 rounded-full glass-card flex items-center gap-1.5 border-white/10">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">groups</span>
+<span class="font-label-caps text-[10px] text-on-surface">12 Captains Nearby</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Bar (Shared Component Execution) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-white/12 dark:bg-white/12 backdrop-blur-[40px] border-t border-white/20 shadow-[0_-4px_20px_rgba(255,255,255,0.05)] md:hidden rounded-t-xl">
+<button class="flex flex-col items-center justify-center text-primary font-bold active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-caps text-label-caps">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center text-secondary-fixed-dim hover:text-primary-fixed-dim active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">two_wheeler</span>
+<span class="font-label-caps text-label-caps">Rides</span>
+</button>
+<button class="flex flex-col items-center justify-center text-secondary-fixed-dim hover:text-primary-fixed-dim active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">verified_user</span>
+<span class="font-label-caps text-label-caps">Safety</span>
+</button>
+<button class="flex flex-col items-center justify-center text-secondary-fixed-dim hover:text-primary-fixed-dim active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-caps text-label-caps">Profile</span>
+</button>
+</nav>
+<!-- Interactive Logic Script -->
+<script>
+        let currentFare = 4.50;
+        const fareDisplay = document.getElementById('fare-display');
+        const heatProgress = document.getElementById('heat-progress');
+        const heatLabel = document.getElementById('heat-label');
+
+        function updateFare(delta) {
+            currentFare = Math.max(2.50, currentFare + delta);
+            fareDisplay.textContent = currentFare.toFixed(2);
+            
+            // Simulate heat change
+            let heat;
+            if (currentFare < 4.00) {
+                heat = Math.floor(30 + Math.random() * 20);
+                heatLabel.textContent = `Low (${heat}%)`;
+                heatLabel.className = "text-error font-bold";
+            } else if (currentFare < 5.00) {
+                heat = Math.floor(75 + Math.random() * 15);
+                heatLabel.textContent = `High (${heat}%)`;
+                heatLabel.className = "text-primary font-bold";
+            } else {
+                heat = Math.floor(95 + Math.random() * 5);
+                heatLabel.textContent = `Instant (${heat}%)`;
+                heatLabel.className = "text-tertiary font-bold";
+            }
+            
+            heatProgress.style.width = heat + '%';
+            
+            // Add subtle pulse on update
+            fareDisplay.parentElement.classList.add('scale-110');
+            setTimeout(() => {
+                fareDisplay.parentElement.classList.remove('scale-110');
+            }, 200);
+        }
+
+        // Automatic heat fluctuation for realism
+        setInterval(() => {
+            let variance = (Math.random() - 0.5) * 4;
+            let currentWidth = parseFloat(heatProgress.style.width);
+            heatProgress.style.width = Math.min(100, Math.max(10, currentWidth + variance)) + '%';
+        }, 3000);
+    </script>
+</body></html>

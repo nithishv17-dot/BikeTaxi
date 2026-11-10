@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RideGo Live Tracking</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-on-surface": "#2f3131",
+                    "surface-container": "#1e2020",
+                    "on-tertiary-fixed-variant": "#004c69",
+                    "surface-container-low": "#1a1c1c",
+                    "surface-bright": "#37393a",
+                    "on-secondary-fixed-variant": "#474646",
+                    "primary-fixed-dim": "#ffb77d",
+                    "secondary": "#c8c6c5",
+                    "on-tertiary-container": "#00435d",
+                    "tertiary-fixed-dim": "#7ad0ff",
+                    "inverse-primary": "#904d00",
+                    "on-surface": "#e2e2e2",
+                    "on-tertiary": "#003549",
+                    "surface": "#121414",
+                    "tertiary-fixed": "#c3e8ff",
+                    "outline-variant": "#564334",
+                    "on-primary-container": "#623200",
+                    "on-secondary": "#313030",
+                    "on-primary-fixed": "#2f1500",
+                    "on-primary-fixed-variant": "#6e3900",
+                    "secondary-container": "#4a4949",
+                    "secondary-fixed-dim": "#c8c6c5",
+                    "primary-fixed": "#ffdcc3",
+                    "error-container": "#93000a",
+                    "on-tertiary-fixed": "#001e2c",
+                    "surface-container-highest": "#333535",
+                    "surface-dim": "#121414",
+                    "on-error": "#690005",
+                    "error": "#ffb4ab",
+                    "primary": "#ffb77d",
+                    "background": "#121414",
+                    "on-background": "#e2e2e2",
+                    "tertiary": "#7ad0ff",
+                    "outline": "#a48c7a",
+                    "primary-container": "#ff8c00",
+                    "on-secondary-fixed": "#1c1b1b",
+                    "surface-container-lowest": "#0c0f0f",
+                    "on-secondary-container": "#bab8b7",
+                    "surface-tint": "#ffb77d",
+                    "on-primary": "#4d2600",
+                    "on-surface-variant": "#ddc1ae",
+                    "surface-variant": "#333535",
+                    "surface-container-high": "#282a2b",
+                    "inverse-surface": "#e2e2e2",
+                    "on-error-container": "#ffdad6",
+                    "tertiary-container": "#00b6f3",
+                    "secondary-fixed": "#e5e2e1"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin-desktop": "40px",
+                    "sm": "16px",
+                    "md": "24px",
+                    "lg": "32px",
+                    "gutter": "16px",
+                    "margin-mobile": "20px",
+                    "base": "4px",
+                    "xs": "8px",
+                    "xl": "48px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Be Vietnam Pro"],
+                    "title-md": ["Be Vietnam Pro"],
+                    "headline-lg-mobile": ["Be Vietnam Pro"],
+                    "headline-lg": ["Be Vietnam Pro"],
+                    "display-lg": ["Be Vietnam Pro"],
+                    "body-sm": ["Be Vietnam Pro"],
+                    "label-caps": ["Be Vietnam Pro"]
+            },
+            "fontSize": {
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glass-sheet {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(40px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .pulse-blue {
+            animation: pulse-blue 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-blue {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .7; transform: scale(1.05); }
+        }
+        .map-gradient {
+            background: linear-gradient(to bottom, rgba(18, 20, 20, 0.8) 0%, transparent 20%, transparent 80%, rgba(18, 20, 20, 0.9) 100%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-lg min-h-screen overflow-hidden selection:bg-primary/30">
+<!-- Persistent Map Layer -->
+<div class="fixed inset-0 z-0">
+<img alt="Dark themed urban street map with simplified geometry and high contrast routes." class="w-full h-full object-cover filter brightness-50 contrast-125 grayscale-[0.2]" data-location="New York City" src="https://lh3.googleusercontent.com/aida-public/AB6AXuATFn2l2MO8mH0YyCp1NiBmTSZm32J4-6ksN7ICY6ozBTDKKuUv96pYbFn_R-uJJ-W33ASbg2_IuqswCx-TtjcZrFjF0Vbx6cLb286iUqX-E0ee9vPbec_tOqTP6cCTnDKpSpEjXekPsPQ4i1Uwa8B32mUDrfnGU4yoK7egFTR01MYPIFVEMg0FRyiYWMWbEVmqS6zhf14CnuIgAs40REOxQhFJ_D1uZMOGLbJVgkQESq0QofFgTJrHUaCFgKAyhnWUijb0kfpJ9R0"/>
+<div class="absolute inset-0 map-gradient"></div>
+<!-- Optimized Blue Path (Visual Representation) -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" fill="none" viewbox="0 0 400 800" xmlns="http://www.w3.org/2000/svg">
+<path class="opacity-80" d="M100 700C120 650 250 620 280 500C310 380 150 350 180 200" stroke="#00b6f3" stroke-dasharray="1 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="6"></path>
+<path class="opacity-50 blur-[2px]" d="M100 700C120 650 250 620 280 500C310 380 150 350 180 200" stroke="#00b6f3" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"></path>
+<!-- User Dot -->
+<circle class="animate-pulse" cx="100" cy="700" fill="#ffb77d" r="8"></circle>
+<!-- Destination Dot -->
+<circle cx="180" cy="200" fill="#00b6f3" r="10"></circle>
+<circle class="pulse-blue" cx="180" cy="200" r="16" stroke="#00b6f3" stroke-opacity="0.3" stroke-width="2"></circle>
+</svg>
+</div>
+<!-- Top App Bar (Shared Component Logic) -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-margin-mobile h-16 bg-white/5 dark:bg-white/5 backdrop-blur-md border-b border-white/10 shadow-sm">
+<div class="flex items-center gap-4">
+<button class="text-primary active:scale-95 transition-transform">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-display-lg text-[24px] font-extrabold text-primary tracking-tight">RideGo</h1>
+</div>
+<div class="flex items-center gap-3">
+<div class="glass-card px-3 py-1 rounded-full flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary text-sm" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="font-label-caps text-label-caps text-on-surface">Live Tracking</span>
+</div>
+<div class="w-10 h-10 rounded-full border-2 border-primary/20 overflow-hidden">
+<img alt="User avatar" data-alt="A professional headshot of a smiling male user in his late 20s with a clean, modern aesthetic. The background is a soft, blurred studio setting with warm amber tones that match the brand's primary color palette. The lighting is flattering and high-end, emphasizing a sense of reliability and community membership." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBUXu-tCHGmLu7Z32NEZnpJODXci3jqIXs-oAh_nSfNqha2zQ-u5sxxofXbkeedI-Yy9OuWsd9jLaUVxtBxN58HKE9GP9PmDsVr0eiuF_MoXH6bv6vQVOj89tWhzD8mttPNXpWko2Gm4plRlaSfqX-IWhPlxbr2oqEFUfFFxiZ2EzUoTomORmYTn2QR419IMfGm2jfNJZZIXdWfF4hNkRbj4_CPqnRNg_fCPhn4v6iZHaS4GJVfHN7p_VXqUkkfR5o6I9QMwCKeTA"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="relative z-10 pt-20 px-margin-mobile flex flex-col h-[calc(100vh-64px)] justify-between pb-32">
+<!-- Floating Info Cards -->
+<div class="space-y-4">
+<!-- ETA Card -->
+<div class="glass-card p-4 rounded-xl flex justify-between items-center max-w-sm mx-auto w-full">
+<div>
+<p class="font-label-caps text-label-caps text-on-surface-variant mb-1">ESTIMATED ARRIVAL</p>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">12:48 PM</h2>
+</div>
+<div class="text-right">
+<p class="font-label-caps text-label-caps text-on-surface-variant mb-1">REMAINING</p>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-tertiary">8 mins</h2>
+</div>
+</div>
+<!-- Captain Profile Quick View -->
+<div class="glass-card p-4 rounded-xl max-w-sm mx-auto w-full flex items-center gap-4 border-l-4 border-primary">
+<div class="relative">
+<img alt="Captain Portrait" class="w-14 h-14 rounded-lg object-cover" data-alt="A portrait of a confident bike captain wearing a professional charcoal grey uniform and a sleek black helmet. He has a friendly, professional expression, and the background is a blurred cityscape at sunset, reflecting the urban bike-taxi theme. The lighting is warm and cinematic, suggesting high safety standards and expertise." src="https://lh3.googleusercontent.com/aida-public/AB6AXuATvawxH227tuQ6y16rKvCpkBBwvmwq5nKQh84raHTBRgh8IprT-YAQIxj24B5uFvVn4HqGEN5to1WPgDoYbc_pDCc6u7QuXZSnklOaSoKriesO_KaJpo7xdIP0k4LUjdvIxxyNbNQrYMzPymCpbgzYthHby7IVGIL8yyFUj-E07-3UoTZ9ojrU28pXd4FOwMhCQPVNZgh-33XjsUfpZPtWX6at0GRekpppGdCLmFgmioPtXQq-qZ-sq2BfYAOqBbEVRATdjX4o4oQ"/>
+<div class="absolute -bottom-1 -right-1 bg-primary text-on-primary rounded-full p-0.5">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">stars</span>
+</div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-title-md text-title-md text-on-surface">Alex Rider</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Honda Hornet • NY-8821</p>
+</div>
+<div class="bg-white/10 px-2 py-0.5 rounded flex items-center gap-1">
+<span class="material-symbols-outlined text-primary text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-caps text-label-caps">4.9</span>
+</div>
+</div>
+<div class="mt-2 flex gap-2">
+<span class="bg-tertiary/20 text-tertiary font-label-caps text-[10px] px-2 py-0.5 rounded-full border border-tertiary/30">SAFETY BADGE</span>
+<span class="bg-white/5 text-on-surface-variant font-label-caps text-[10px] px-2 py-0.5 rounded-full">500+ RIDES</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Controls -->
+<div class="fixed bottom-32 left-1/2 -translate-x-1/2 w-full px-margin-mobile max-w-sm flex gap-3">
+<button class="flex-1 glass-sheet h-14 rounded-xl flex items-center justify-center gap-2 text-on-surface hover:bg-white/20 transition-all active:scale-95">
+<span class="material-symbols-outlined">message</span>
+<span class="font-label-caps">Chat</span>
+</button>
+<button class="flex-1 glass-sheet h-14 rounded-xl flex items-center justify-center gap-2 text-error hover:bg-error/10 transition-all active:scale-95 border border-error/20">
+<span class="material-symbols-outlined">sos</span>
+<span class="font-label-caps">Emergency</span>
+</button>
+</div>
+</main>
+<!-- Bottom Safety Analyzer (Persistent) -->
+<section class="fixed bottom-0 left-0 w-full z-50">
+<!-- Safety Analyzer Status Bar -->
+<div class="glass-sheet px-6 pt-3 pb-8 rounded-t-[24px] border-t border-white/30 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+<div class="w-12 h-1 bg-white/20 rounded-full mx-auto mb-4"></div>
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-tertiary-container/30 flex items-center justify-center relative">
+<span class="material-symbols-outlined text-tertiary animate-pulse">sensors</span>
+<div class="absolute inset-0 rounded-full border border-tertiary/50 animate-ping opacity-20"></div>
+</div>
+<div>
+<h4 class="font-title-md text-[16px] text-on-surface">Safety Analyzer</h4>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span class="font-label-caps text-[11px] text-tertiary uppercase tracking-wider">Safe Ride Confirmed</span>
+</div>
+</div>
+</div>
+<div class="text-right">
+<p class="font-label-caps text-on-surface-variant text-[10px]">G-FORCE</p>
+<div class="flex gap-0.5 mt-1 h-3 items-end">
+<div class="w-1 bg-tertiary/40 h-1"></div>
+<div class="w-1 bg-tertiary/40 h-2"></div>
+<div class="w-1 bg-tertiary h-1.5"></div>
+<div class="w-1 bg-tertiary/40 h-1"></div>
+<div class="w-1 bg-tertiary/40 h-2"></div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3 mb-4">
+<div class="glass-card p-3 rounded-xl">
+<p class="font-label-caps text-[10px] text-on-surface-variant mb-1">STABILITY</p>
+<div class="flex items-center justify-between">
+<span class="font-body-lg font-bold text-on-surface">98%</span>
+<span class="material-symbols-outlined text-tertiary text-sm">shield_with_heart</span>
+</div>
+</div>
+<div class="glass-card p-3 rounded-xl">
+<p class="font-label-caps text-[10px] text-on-surface-variant mb-1">AVG SPEED</p>
+<div class="flex items-center justify-between">
+<span class="font-body-lg font-bold text-on-surface">42 km/h</span>
+<span class="material-symbols-outlined text-primary text-sm">speed</span>
+</div>
+</div>
+</div>
+<button class="w-full bg-primary-container h-14 rounded-xl flex items-center justify-center gap-2 text-on-primary-container font-bold active:scale-[0.98] transition-all shadow-lg">
+<span class="material-symbols-outlined">share_location</span>
+<span>Share Live Trip</span>
+</button>
+</div>
+</section>
+<!-- Navigation Overlay Logic (Only Bottom Nav for Top Level, not here) -->
+<!-- But we need a "Back" or "Cancel" if applicable - represented by TopAppBar leading -->
+<script>
+        // Micro-interactions and simulation logic
+        document.addEventListener('DOMContentLoaded', () => {
+            const statusText = document.querySelector('.tracking-wider');
+            const sensorIcon = document.querySelector('.animate-pulse');
+            
+            // Randomly simulate sensor data fluctuation
+            setInterval(() => {
+                const gForceBars = document.querySelectorAll('.flex.gap-0\\.5 div');
+                gForceBars.forEach(bar => {
+                    const randomHeight = Math.floor(Math.random() * 8) + 4;
+                    bar.style.height = `${randomHeight}px`;
+                    bar.style.opacity = Math.random() > 0.5 ? '1' : '0.4';
+                });
+            }, 500);
+
+            // Subtle parallax on map
+            window.addEventListener('deviceorientation', (event) => {
+                const map = document.querySelector('img[data-location]');
+                if (event.beta && event.gamma) {
+                    const x = event.gamma / 10;
+                    const y = event.beta / 10;
+                    map.style.transform = `scale(1.1) translate(${x}px, ${y}px)`;
+                }
+            });
+        });
+    </script>
+</body></html>

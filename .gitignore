@@ -1,0 +1,12 @@
+node_modules/
+.env
+build/
+!frontend/bike_taxi_app/build/
+frontend/bike_taxi_app/build/*
+!frontend/bike_taxi_app/build/web/
+.dart_tool/
+.packages
+.pub/
+.vscode/
+.idea/
+*.log
