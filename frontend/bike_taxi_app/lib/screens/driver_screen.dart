@@ -325,6 +325,7 @@ class _DriverScreenState extends State<DriverScreen> {
     _stopRefreshTimer();
     _stopLocationUpdates();
     SocketService.removeAllRideListeners();
+    SocketService.stopListeningDriverAvailabilityChanged();
     rideIdController.dispose();
     for (final controller in offerControllers.values) {
       controller.dispose();

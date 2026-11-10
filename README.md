@@ -113,7 +113,7 @@ If you want to edit the Flutter/Dart source code with hot-reload:
    cd frontend/bike_taxi_app
    ```
 3. **Install Flutter packages**:
-   ```bash
+   ```bash  
    flutter pub get
    ```
 4. **Launch the web app in Chrome**:

@@ -9,6 +9,8 @@ import 'package:go_router/go_router.dart';
 
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
+import '../services/session_service.dart';
+import '../services/location_service.dart';
 import '../services/routing_service.dart';
 import '../config/app_config.dart';
 import '../theme/premium_ui.dart';
@@ -44,8 +46,34 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   bool normalModeTimeout = false;
   Timer? _normalTimeoutTimer;
   List<LatLng> _roadRoutePoints = [];
+  double? liveRiderLat;
+  double? liveRiderLng;
+  Timer? _liveLocationTimer;
 
   RideMode get rideMode => isNegotiationRide ? RideMode.negotiation : RideMode.normal;
+
+  void _startLiveLocationTracking() {
+    _liveLocationTimer?.cancel();
+    _liveLocationTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+      if (!mounted) return;
+      try {
+        final pos = await LocationService.getBestCurrentLocation(
+          context: context,
+          timeout: const Duration(seconds: 3),
+          allowFallback: true,
+        );
+        if (pos != null && mounted) {
+          if (widget.isDriver) {
+            final session = SessionService.loadSession();
+            final driverId = session?["userId"] ?? "";
+            SocketService.emitUpdateDriverLocation(widget.rideId, driverId, pos.latitude, pos.longitude);
+          } else {
+            SocketService.emitUpdateRiderLocation(widget.rideId, pos.latitude, pos.longitude);
+          }
+        }
+      } catch (_) {}
+    });
+  }
 
   void _startNormalTimeoutTimer() {
     _cancelNormalTimeoutTimer();
@@ -95,16 +123,20 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   @override
   void initState() {
     super.initState();
+    SocketService.emitJoinRide(widget.rideId);
+    _startLiveLocationTracking();
     fetchRide();
     listenToRideEvents();
   }
 
   @override
   void dispose() {
+    _liveLocationTimer?.cancel();
     _cancelNormalTimeoutTimer();
     countdownTimer?.cancel();
     SocketService.removeAllRideListeners();
     SocketService.stopListeningDriverLocationUpdated();
+    SocketService.stopListeningRiderLocationUpdated();
     otpController.dispose();
     super.dispose();
   }
@@ -344,6 +376,20 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             }
             ride = nextRide;
           }
+        });
+      }
+    });
+
+    SocketService.listenRiderLocationUpdated((data) {
+      if (data == null) return;
+      final rideId = _normalizeRideId(data["rideId"]);
+      if (rideId != null && rideId != widget.rideId) return;
+      final lat = _toDouble(data["lat"]);
+      final lng = _toDouble(data["lng"]);
+      if (mounted && lat != null && lng != null) {
+        setState(() {
+          liveRiderLat = lat;
+          liveRiderLng = lng;
         });
       }
     });
@@ -2077,6 +2123,33 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             ),
             child: const Center(
               child: Icon(Icons.pedal_bike_rounded, color: Color(0xFF111827), size: 22),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (liveRiderLat != null && liveRiderLng != null) {
+      markers.add(
+        Marker(
+          point: LatLng(liveRiderLat!, liveRiderLng!),
+          width: 42,
+          height: 42,
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF3B82F6),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2.5),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.55),
+                  blurRadius: 14,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: const Center(
+              child: Icon(Icons.person_pin_circle_rounded, color: Colors.white, size: 24),
             ),
           ),
         ),
