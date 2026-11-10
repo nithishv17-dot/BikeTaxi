@@ -76,7 +76,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       message = "";
     });
 
-    final selectedEmail = await showDialog<String>(
+    final selectedAccount = await showDialog<Map<String, String>>(
       context: context,
       barrierDismissible: true,
       builder: (BuildContext context) {
@@ -123,17 +123,65 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   title: const Text("Nithish Kumar", style: TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: const Text("nithish.kumar@gmail.com"),
-                  onTap: () => Navigator.pop(context, "nithish.kumar@gmail.com"),
+                  onTap: () => Navigator.pop(context, {
+                    "email": "nithish.kumar@gmail.com",
+                    "name": "Nithish Kumar",
+                    "role": isDriver ? "driver" : "user",
+                  }),
                 ),
                 const Divider(),
                 ListTile(
                   leading: const CircleAvatar(
-                    backgroundColor: AppPalette.secondary,
-                    child: Text("GU", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    backgroundColor: Color(0xFF3B82F6),
+                    child: Text("GR", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
-                  title: const Text("Guest User", style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text("guest.taxi@gmail.com"),
-                  onTap: () => Navigator.pop(context, "guest.taxi@gmail.com"),
+                  title: Row(
+                    children: [
+                      const Text("Guest Rider", style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF3B82F6).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text("RIDER", style: TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  subtitle: const Text("guest.rider@gmail.com"),
+                  onTap: () => Navigator.pop(context, {
+                    "email": "guest.rider@gmail.com",
+                    "name": "Guest Rider",
+                    "role": "user",
+                  }),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFF10B981),
+                    child: Text("GD", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                  title: Row(
+                    children: [
+                      const Text("Guest Driver", style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text("CAPTAIN", style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  subtitle: const Text("guest.driver@gmail.com"),
+                  onTap: () => Navigator.pop(context, {
+                    "email": "guest.driver@gmail.com",
+                    "name": "Guest Driver",
+                    "role": "driver",
+                  }),
                 ),
               ],
             ),
@@ -142,7 +190,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       },
     );
 
-    if (selectedEmail == null) {
+    if (selectedAccount == null) {
       setState(() {
         isLoading = false;
       });
@@ -177,25 +225,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!mounted) return;
     Navigator.pop(context); // Close connecting dialog
 
+    final selectedEmail = selectedAccount["email"]!;
+    final targetRole = selectedAccount["role"] ?? (isDriver ? "driver" : "user");
+    final mockName = selectedAccount["name"] ?? (selectedEmail.split("@").first + " (Google)");
     final mockIdentifier = selectedEmail; // email acts as phone/identifier
-    final mockName = selectedEmail.split("@").first
-        .replaceAll(RegExp(r'[._-]'), ' ')
-        .split(' ')
-        .map((s) => s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : '')
-        .join(' ') + " (Google)";
     const mockPassword = "google-sign-in-password-auth";
 
     try {
       Map<String, dynamic> loginResponse;
-      String actualRole = isDriver ? "driver" : "user";
+      String actualRole = targetRole;
 
       try {
         loginResponse = await ApiService.login(
           mockIdentifier,
           mockPassword,
-          role: isDriver ? "driver" : "user",
+          role: targetRole,
         );
-        actualRole = loginResponse["role"]?.toString() ?? actualRole;
+        actualRole = loginResponse["role"]?.toString() ?? targetRole;
       } catch (loginErr) {
         final errStr = loginErr.toString();
         if (errStr.contains("User not found")) {
@@ -203,15 +249,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
             mockName,
             mockIdentifier,
             mockPassword,
-            role: isDriver ? "driver" : "user",
+            role: targetRole,
           );
           loginResponse = await ApiService.login(
             mockIdentifier,
             mockPassword,
-            role: isDriver ? "driver" : "user",
+            role: targetRole,
           );
-          actualRole = loginResponse["role"]?.toString() ?? actualRole;
-        } else if (errStr.contains("This account is not a driver account")) {
+          actualRole = loginResponse["role"]?.toString() ?? targetRole;
+        } else if (errStr.contains("This account is not a driver account") && targetRole != "driver") {
           loginResponse = await ApiService.login(
             mockIdentifier,
             mockPassword,

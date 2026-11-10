@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../config/app_config.dart';
 import '../ui/pro_widgets.dart';
 
 import '../services/api_service.dart';
@@ -370,30 +371,15 @@ class _DriverScreenState extends State<DriverScreen> {
       Map<String, double>? location;
       try {
         location = await LocationService.getBestCurrentLocation(
-          timeout: const Duration(seconds: 8),
-          allowFallback: false,
+          timeout: const Duration(seconds: 4),
+          allowFallback: true,
         );
       } catch (e) {
         debugPrint("[DriverDutyToggle] Geolocation resolution error: $e");
       }
 
-      if (location == null) {
-        if (!mounted) return;
-        setState(() {
-          isTogglingDuty = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Please enable location access to go On Duty."),
-            backgroundColor: Color(0xFFEF4444),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        return;
-      }
-
-      final double lat = location['lat']!;
-      final double lng = location['lng']!;
+      final double lat = location?['lat'] ?? AppConfig.defaultLat;
+      final double lng = location?['lng'] ?? AppConfig.defaultLng;
 
       try {
         final response = await ApiService.toggleDriver(
