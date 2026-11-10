@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Ride = require("../models/Ride");
 const User = require("../models/User");
+const Driver = require("../models/Driver");
 const { calculateFare } = require("../services/fareService");
 
 const extractObjectId = (input) => {
@@ -497,16 +498,40 @@ exports.acceptRide = async (req, res) => {
       });
     }
 
+    const assignedDriverId = req.body?.driverId || req.user?.id || ride.driverId;
+    if (assignedDriverId) {
+      ride.driverId = assignedDriverId;
+    }
+
     ride.status = "accepted";
     ride.otp = Math.floor(1000 + Math.random() * 9000).toString();
     await ride.save();
+
+    if (assignedDriverId) {
+      await User.findByIdAndUpdate(assignedDriverId, { $set: { isAvailable: false } });
+      try {
+        await Driver.findOneAndUpdate(
+          { $or: [{ _id: assignedDriverId }, { phone: (await User.findById(assignedDriverId))?.phone }] },
+          { $set: { available: false } }
+        );
+      } catch (_) {}
+
+      io.to(`driver_${assignedDriverId}`).emit("driver_availability_changed", {
+        driverId: assignedDriverId.toString(),
+        isAvailable: false
+      });
+      io.emit("driver_status_changed", {
+        driverId: assignedDriverId.toString(),
+        isAvailable: false
+      });
+    }
 
     const refreshedRide = await getPopulatedRide(ride._id);
     io.emit("rideAccepted", refreshedRide);
 
     return res.status(200).json({
       message: "Ride accepted successfully",
-      ride
+      ride: refreshedRide || ride
     });
   } catch (error) {
     console.log("ACCEPT RIDE ERROR:", error);
@@ -604,6 +629,21 @@ exports.completeRide = async (req, res) => {
         driver.isAvailable = true;
         await driver.save();
       }
+      try {
+        await Driver.findOneAndUpdate(
+          { $or: [{ _id: ride.driverId }, { phone: driver?.phone }] },
+          { $set: { available: true } }
+        );
+      } catch (_) {}
+
+      io.to(`driver_${ride.driverId}`).emit("driver_availability_changed", {
+        driverId: ride.driverId.toString(),
+        isAvailable: true
+      });
+      io.emit("driver_status_changed", {
+        driverId: ride.driverId.toString(),
+        isAvailable: true
+      });
     }
 
     const refreshedRide = await getPopulatedRide(ride._id);
@@ -653,6 +693,21 @@ exports.cancelRide = async (req, res) => {
         driver.isAvailable = true;
         await driver.save();
       }
+      try {
+        await Driver.findOneAndUpdate(
+          { $or: [{ _id: ride.driverId }, { phone: driver?.phone }] },
+          { $set: { available: true } }
+        );
+      } catch (_) {}
+
+      io.to(`driver_${ride.driverId}`).emit("driver_availability_changed", {
+        driverId: ride.driverId.toString(),
+        isAvailable: true
+      });
+      io.emit("driver_status_changed", {
+        driverId: ride.driverId.toString(),
+        isAvailable: true
+      });
     }
 
     const refreshedRide = await getPopulatedRide(ride._id);
@@ -973,6 +1028,21 @@ exports.confirmRideOffer = async (req, res) => {
       driver.isAvailable = false;
       await driver.save();
     }
+    try {
+      await Driver.findOneAndUpdate(
+        { $or: [{ _id: selectedOffer.driverId }, { phone: driver?.phone }] },
+        { $set: { available: false } }
+      );
+    } catch (_) {}
+
+    io.to(`driver_${selectedOffer.driverId}`).emit("driver_availability_changed", {
+      driverId: selectedOffer.driverId.toString(),
+      isAvailable: false
+    });
+    io.emit("driver_status_changed", {
+      driverId: selectedOffer.driverId.toString(),
+      isAvailable: false
+    });
 
     const refreshedRide = await Ride.findById(ride._id)
       .populate("userId", "name phone")
@@ -1082,6 +1152,21 @@ exports.expireRequestedRides = async (io) => {
         driver.isAvailable = true;
         await driver.save();
       }
+      try {
+        await Driver.findOneAndUpdate(
+          { $or: [{ _id: ride.driverId }, { phone: driver?.phone }] },
+          { $set: { available: true } }
+        );
+      } catch (_) {}
+
+      io.to(`driver_${ride.driverId}`).emit("driver_availability_changed", {
+        driverId: ride.driverId.toString(),
+        isAvailable: true
+      });
+      io.emit("driver_status_changed", {
+        driverId: ride.driverId.toString(),
+        isAvailable: true
+      });
     }
 
     const refreshedRide = await getPopulatedRide(ride._id);

@@ -104,6 +104,72 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void loginAsGuest() async {
+    setState(() {
+      isLoading = true;
+      result = "";
+    });
+
+    try {
+      final role = isDriver ? "driver" : "rider";
+      final response = await ApiService.guestLogin(role);
+
+      if (response["token"] != null && response["userId"] != null) {
+        ApiService.token = response["token"];
+        final userRole = response["role"]?.toString() ?? (isDriver ? "driver" : "user");
+        final sessionId = response["sessionId"]?.toString();
+        SessionService.saveSession(
+          response["token"],
+          response["userId"],
+          userRole,
+          sessionId: sessionId,
+          name: response["name"]?.toString(),
+          phone: response["phone"]?.toString(),
+        );
+
+        SocketService.connect(
+          token: response["token"],
+          userId: response["userId"],
+          sessionId: sessionId,
+        );
+        SocketService.authenticate(
+          token: response["token"],
+          userId: response["userId"],
+          sessionId: sessionId,
+        );
+
+        if (!mounted) return;
+
+        if (userRole == "driver") {
+          try {
+            await ApiService.toggleDriver(response["userId"], isAvailable: true);
+          } catch (e) {
+            print("Auto-set online error: $e");
+          }
+          if (!mounted) return;
+          context.go('/driver');
+        } else {
+          context.go('/home');
+        }
+      } else {
+        setState(() {
+          result = response["message"] ?? "Guest login failed";
+        });
+      }
+    } catch (e) {
+      print("GUEST LOGIN ERROR: $e");
+      setState(() {
+        result = e.toString().replaceFirst("Exception: ", "");
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
   void loginWithGoogle() async {
     setState(() {
       isLoading = true;
@@ -133,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(width: 12),
                     const Text(
-                      "Sign in with Google",
+                      "Sign In with Google",
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -152,7 +218,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 18),
                 ListTile(
                   leading: const CircleAvatar(
-                    backgroundColor: AppPalette.primary,
+                    backgroundColor: Color(0xFFF4A261),
                     child: Text("NK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                   title: const Text("Nithish Kumar", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -255,58 +321,25 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
 
-    await Future.delayed(const Duration(seconds: 1));
+    await Future.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
     Navigator.pop(context); // Close connecting dialog
 
     final selectedEmail = selectedAccount["email"]!;
     final targetRole = selectedAccount["role"] ?? (isDriver ? "driver" : "user");
     final mockName = selectedAccount["name"] ?? (selectedEmail.split("@").first + " (Google)");
-    final mockIdentifier = selectedEmail;
-    const mockPassword = "google-sign-in-password-auth";
 
     try {
-      Map<String, dynamic> loginResponse;
-      String actualRole = targetRole;
+      final loginResponse = await ApiService.googleLogin(
+        "mock-google-id-token",
+        targetRole,
+        email: selectedEmail,
+        name: mockName,
+      );
 
-      try {
-        loginResponse = await ApiService.login(
-          mockIdentifier,
-          mockPassword,
-          role: targetRole,
-        );
-        actualRole = loginResponse["role"]?.toString() ?? targetRole;
-      } catch (loginErr) {
-        final errStr = loginErr.toString();
-        if (errStr.contains("User not found")) {
-          await ApiService.register(
-            mockName,
-            mockIdentifier,
-            mockPassword,
-            role: targetRole,
-          );
-          loginResponse = await ApiService.login(
-            mockIdentifier,
-            mockPassword,
-            role: targetRole,
-          );
-          actualRole = loginResponse["role"]?.toString() ?? targetRole;
-        } else if (errStr.contains("This account is not a driver account") && targetRole != "driver") {
-          loginResponse = await ApiService.login(
-            mockIdentifier,
-            mockPassword,
-            role: "user",
-          );
-          actualRole = "user";
-        } else {
-          rethrow;
-        }
-      }
-
-      if (loginResponse["message"] == "Login successful" &&
-          loginResponse["token"] != null &&
-          loginResponse["userId"] != null) {
+      if (loginResponse["token"] != null && loginResponse["userId"] != null) {
         ApiService.token = loginResponse["token"];
+        final actualRole = loginResponse["role"]?.toString() ?? targetRole;
         final sessionId = loginResponse["sessionId"]?.toString();
         SessionService.saveSession(
           loginResponse["token"],
@@ -592,6 +625,30 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 Expanded(child: Divider(color: AppPalette.slate300.withOpacity(0.5))),
                               ],
+                            ),
+                            const SizedBox(height: 14),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 54),
+                                side: BorderSide(color: AppPalette.slate300.withOpacity(0.7)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                              ),
+                              onPressed: isLoading ? null : loginAsGuest,
+                              icon: const Icon(
+                                Icons.person_outline_rounded,
+                                color: AppPalette.primary,
+                                size: 22,
+                              ),
+                              label: Text(
+                                isDriver ? "Continue as Guest Driver" : "Continue as Guest Rider",
+                                style: const TextStyle(
+                                  color: AppPalette.slate900,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                ),
+                              ),
                             ),
                             const SizedBox(height: 12),
                             OutlinedButton.icon(

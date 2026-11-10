@@ -224,6 +224,27 @@ class _DriverScreenState extends State<DriverScreen> {
     SocketService.listenNegotiationClosed((_) => _loadDriverStatus(silent: true));
     SocketService.listenNegotiationRideRequested((_) => _loadDriverStatus(silent: true));
     SocketService.listenNegotiationOfferAcceptedByUser((data) => _handleDriverAssignedSocket(data));
+    SocketService.listenDriverAvailabilityChanged((data) {
+      if (!mounted) return;
+      if (data is Map) {
+        final dId = data["driverId"]?.toString();
+        if (dId == null || dId == widget.driverId) {
+          final newAvailable = data["isAvailable"] == true;
+          if (isAvailable != newAvailable) {
+            setState(() {
+              isAvailable = newAvailable;
+            });
+            if (newAvailable) {
+              _startRefreshTimer();
+              _startLocationUpdates();
+            } else {
+              _stopRefreshTimer();
+              _stopLocationUpdates();
+            }
+          }
+        }
+      }
+    });
   }
 
   Future<void> _loadDriverStatus({bool silent = false}) async {

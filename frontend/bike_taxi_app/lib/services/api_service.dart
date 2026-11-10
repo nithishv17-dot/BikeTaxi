@@ -60,6 +60,46 @@ class ApiService {
     return _handleResponse(response, isAuthEndpoint: true);
   }
 
+  static Future<Map<String, dynamic>> guestLogin(String role) async {
+    final response = await http.post(
+      Uri.parse("$baseUrl/auth/guest-login"),
+      headers: {
+        "Content-Type": "application/json",
+        "Bypass-Tunnel-Reminder": "true",
+      },
+      body: jsonEncode({"role": role}),
+    );
+
+    return _handleResponse(response, isAuthEndpoint: true);
+  }
+
+  static Future<Map<String, dynamic>> googleLogin(
+    String idToken,
+    String role, {
+    String? email,
+    String? name,
+    String? avatar,
+  }) async {
+    final body = <String, dynamic>{
+      "idToken": idToken,
+      "role": role,
+    };
+    if (email != null && email.isNotEmpty) body["email"] = email;
+    if (name != null && name.isNotEmpty) body["name"] = name;
+    if (avatar != null && avatar.isNotEmpty) body["avatar"] = avatar;
+
+    final response = await http.post(
+      Uri.parse("$baseUrl/auth/google-login"),
+      headers: {
+        "Content-Type": "application/json",
+        "Bypass-Tunnel-Reminder": "true",
+      },
+      body: jsonEncode(body),
+    );
+
+    return _handleResponse(response, isAuthEndpoint: true);
+  }
+
   static Future<Map<String, dynamic>> toggleDriver(
     String driverId, {
     bool? isAvailable,

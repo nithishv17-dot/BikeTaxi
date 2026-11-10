@@ -252,6 +252,53 @@ class SocketService {
     }
   }
 
+  static void emitJoinRide(String rideId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit("join_ride", {"rideId": rideId});
+    }
+  }
+
+  static void emitUpdateRiderLocation(String rideId, double lat, double lng) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit("update_rider_location", {
+        "rideId": rideId,
+        "lat": lat,
+        "lng": lng,
+      });
+    }
+  }
+
+  static void emitUpdateDriverLocation(String rideId, String driverId, double lat, double lng) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit("update_driver_location", {
+        "rideId": rideId,
+        "driverId": driverId,
+        "lat": lat,
+        "lng": lng,
+      });
+    }
+  }
+
+  static void listenRiderLocationUpdated(Function callback) {
+    socket.on("rider_location_updated", (data) {
+      callback(data);
+    });
+  }
+
+  static void stopListeningRiderLocationUpdated() {
+    socket.off("rider_location_updated");
+  }
+
+  static void listenDriverAvailabilityChanged(Function callback) {
+    socket.on("driver_availability_changed", (data) {
+      callback(data);
+    });
+  }
+
+  static void stopListeningDriverAvailabilityChanged() {
+    socket.off("driver_availability_changed");
+  }
+
   static void listenDriverStatusChanged(Function callback) {
     socket.on("driver_status_changed", (data) {
       callback(data);

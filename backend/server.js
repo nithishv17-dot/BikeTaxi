@@ -80,6 +80,9 @@ app.get("/api/list-normal-rides", async (req, res) => {
 
 /* ---------------- ROUTES ---------------- */
 
+const authRoutes = require("./routes/authRoutes");
+
+app.use("/api/auth", authRoutes);
 app.use("/api/users",userRoutes);
 app.use("/api/rides", ridesRoutes);
 app.use("/api/drivers",driverRoutes);
@@ -140,7 +143,8 @@ io.on("connection", async (socket) => {
     }
     const room = `user_${uidStr}`;
     socket.join(room);
-    console.log(`[SOCKET] Socket ${socket.id} joined room ${room} (sessionId: ${socket.sessionId || "none"})`);
+    socket.join(`driver_${uidStr}`);
+    console.log(`[SOCKET] Socket ${socket.id} joined room ${room} and driver_${uidStr} (sessionId: ${socket.sessionId || "none"})`);
 
     try {
       await User.findByIdAndUpdate(uidStr, { activeSocketId: socket.id });
@@ -290,6 +294,36 @@ io.on("connection", async (socket) => {
       }
     } catch (e) {
       console.log("[SOCKET] driver_location_update error:", e.message);
+    }
+  });
+
+  socket.on("join_ride", (data) => {
+    const rideId = typeof data === "string" ? data : data?.rideId;
+    if (rideId) {
+      socket.join(`ride_${rideId}`);
+      console.log(`[SOCKET] ${socket.id} joined ride_${rideId}`);
+    }
+  });
+
+  socket.on("update_rider_location", (data) => {
+    const rideId = data?.rideId;
+    const lat = Number(data?.lat);
+    const lng = Number(data?.lng);
+    if (!rideId || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    io.to(`ride_${rideId}`).emit("rider_location_updated", { rideId, lat, lng });
+  });
+
+  socket.on("update_driver_location", (data) => {
+    const rideId = data?.rideId;
+    const driverId = (data?.driverId || socket.driverId || socket.userId)?.toString();
+    const lat = Number(data?.lat);
+    const lng = Number(data?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    if (rideId) {
+      io.to(`ride_${rideId}`).emit("driver_location_updated", { rideId, driverId, lat, lng });
+    }
+    if (driverId) {
+      io.emit("driverLocationUpdated", { driverId, lat, lng });
     }
   });
 
