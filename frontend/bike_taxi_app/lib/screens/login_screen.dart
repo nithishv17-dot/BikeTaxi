@@ -187,13 +187,10 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      const googleClientId = String.fromEnvironment(
-        'GOOGLE_CLIENT_ID',
-        defaultValue: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
-      );
-
       final GoogleSignIn googleSignIn = GoogleSignIn(
-        clientId: kIsWeb ? googleClientId : null,
+        clientId: kIsWeb
+            ? '57219954065-obscrq1h5ohuaeiclt58msjm7kjmh5v6.apps.googleusercontent.com'
+            : null,
         scopes: const ['email', 'profile', 'openid'],
       );
 
