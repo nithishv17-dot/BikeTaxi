@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
 import '../services/session_service.dart';
@@ -19,8 +22,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String result = "";
   bool isLoading = false;
+  bool isGuestLoading = false;
+  bool isGoogleLoading = false;
   bool obscurePassword = true;
   bool isDriver = false;
+
+  String get selectedRole => isDriver ? "driver" : "rider";
 
   void loginUser() async {
     if (identifierController.text.trim().isEmpty ||
@@ -106,65 +113,68 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void loginAsGuest() async {
     setState(() {
-      isLoading = true;
+      isGuestLoading = true;
       result = "";
     });
 
     try {
-      final role = isDriver ? "driver" : "rider";
-      final response = await ApiService.guestLogin(role);
+      final role = selectedRole;
+      final response = await ApiService.post('/api/auth/guest-login', {
+        'role': role,
+      });
 
-      if (response["token"] != null && response["userId"] != null) {
-        ApiService.token = response["token"];
-        final userRole = response["role"]?.toString() ?? (isDriver ? "driver" : "user");
-        final sessionId = response["sessionId"]?.toString();
+      if (response['token'] != null) {
+        final token = response['token']?.toString() ?? '';
+        final userId = (response['user']?['id'] ?? response['userId'])?.toString() ?? '';
+        final userRole = (response['user']?['role'] ?? response['role'])?.toString() ?? role;
+        final sessionId = response['sessionId']?.toString();
+
+        ApiService.token = token;
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', token);
+        await prefs.setString('user_id', userId);
+        await prefs.setString('user_role', userRole);
+
         SessionService.saveSession(
-          response["token"],
-          response["userId"],
+          token,
+          userId,
           userRole,
           sessionId: sessionId,
-          name: response["name"]?.toString(),
-          phone: response["phone"]?.toString(),
+          name: response['user']?['name']?.toString() ?? response['name']?.toString(),
+          phone: response['user']?['phone']?.toString() ?? response['phone']?.toString(),
         );
 
-        SocketService.connect(
-          token: response["token"],
-          userId: response["userId"],
-          sessionId: sessionId,
-        );
-        SocketService.authenticate(
-          token: response["token"],
-          userId: response["userId"],
-          sessionId: sessionId,
-        );
+        SocketService.connect(token: token, userId: userId, sessionId: sessionId);
+        SocketService.authenticate(token: token, userId: userId, sessionId: sessionId);
 
         if (!mounted) return;
 
-        if (userRole == "driver") {
+        if (userRole == 'driver' || role == 'driver') {
           try {
-            await ApiService.toggleDriver(response["userId"], isAvailable: true);
+            await ApiService.toggleDriver(userId, isAvailable: true);
           } catch (e) {
-            print("Auto-set online error: $e");
+            debugPrint("Auto-set online error: $e");
           }
           if (!mounted) return;
-          context.go('/driver');
+          context.go('/captain-home');
         } else {
           context.go('/home');
         }
       } else {
         setState(() {
-          result = response["message"] ?? "Guest login failed";
+          result = response['message']?.toString() ?? "Guest login failed";
         });
       }
     } catch (e) {
-      print("GUEST LOGIN ERROR: $e");
+      debugPrint("GUEST LOGIN ERROR: $e");
       setState(() {
         result = e.toString().replaceFirst("Exception: ", "");
       });
     } finally {
       if (mounted) {
         setState(() {
-          isLoading = false;
+          isGuestLoading = false;
         });
       }
     }
@@ -172,222 +182,87 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void loginWithGoogle() async {
     setState(() {
-      isLoading = true;
+      isGoogleLoading = true;
       result = "";
     });
 
-    final selectedAccount = await showDialog<Map<String, String>>(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Image.network(
-                      "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png",
-                      height: 24,
-                      errorBuilder: (c, e, s) => const Icon(Icons.g_mobiledata_rounded, color: AppPalette.primary, size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      "Sign In with Google",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  "Choose an account to continue to RideGo",
-                  style: TextStyle(
-                    color: AppPalette.slate500,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFF4A261),
-                    child: Text("NK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  title: const Text("Nithish Kumar", style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text("nithish.kumar@gmail.com"),
-                  onTap: () => Navigator.pop(context, {
-                    "email": "nithish.kumar@gmail.com",
-                    "name": "Nithish Kumar",
-                    "role": isDriver ? "driver" : "user",
-                  }),
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFF3B82F6),
-                    child: Text("GR", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  title: Row(
-                    children: [
-                      const Text("Guest Rider", style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3B82F6).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text("RIDER", style: TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  subtitle: const Text("guest.rider@gmail.com"),
-                  onTap: () => Navigator.pop(context, {
-                    "email": "guest.rider@gmail.com",
-                    "name": "Guest Rider",
-                    "role": "user",
-                  }),
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFF10B981),
-                    child: Text("GD", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  title: Row(
-                    children: [
-                      const Text("Guest Driver", style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text("CAPTAIN", style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  subtitle: const Text("guest.driver@gmail.com"),
-                  onTap: () => Navigator.pop(context, {
-                    "email": "guest.driver@gmail.com",
-                    "name": "Guest Driver",
-                    "role": "driver",
-                  }),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
-    if (selectedAccount == null) {
-      setState(() {
-        isLoading = false;
-      });
-      return;
-    }
-
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 28, vertical: 22),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: AppPalette.primary),
-                SizedBox(width: 18),
-                Text(
-                  "Connecting to Google...",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    Navigator.pop(context); // Close connecting dialog
-
-    final selectedEmail = selectedAccount["email"]!;
-    final targetRole = selectedAccount["role"] ?? (isDriver ? "driver" : "user");
-    final mockName = selectedAccount["name"] ?? (selectedEmail.split("@").first + " (Google)");
-
     try {
-      final loginResponse = await ApiService.googleLogin(
-        "mock-google-id-token",
-        targetRole,
-        email: selectedEmail,
-        name: mockName,
+      const googleClientId = String.fromEnvironment(
+        'GOOGLE_CLIENT_ID',
+        defaultValue: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
       );
 
-      if (loginResponse["token"] != null && loginResponse["userId"] != null) {
-        ApiService.token = loginResponse["token"];
-        final actualRole = loginResponse["role"]?.toString() ?? targetRole;
-        final sessionId = loginResponse["sessionId"]?.toString();
-        SessionService.saveSession(
-          loginResponse["token"],
-          loginResponse["userId"],
-          actualRole,
-          sessionId: sessionId,
-          name: loginResponse["name"]?.toString(),
-          phone: loginResponse["phone"]?.toString(),
-        );
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        clientId: kIsWeb ? googleClientId : null,
+        scopes: const ['email', 'profile', 'openid'],
+      );
 
-        SocketService.connect(
-          token: loginResponse["token"],
-          userId: loginResponse["userId"],
-          sessionId: sessionId,
-        );
-        SocketService.authenticate(
-          token: loginResponse["token"],
-          userId: loginResponse["userId"],
-          sessionId: sessionId,
-        );
+      final GoogleSignInAccount? account = await googleSignIn.signIn();
+      if (account != null) {
+        final GoogleSignInAuthentication auth = await account.authentication;
+        final String? idToken = auth.idToken;
 
-        if (!mounted) return;
-
-        if (actualRole == "driver") {
-          try {
-            await ApiService.toggleDriver(loginResponse["userId"], isAvailable: true);
-          } catch (e) {
-            print("Auto-set online error: $e");
-          }
-          if (!mounted) return;
-          context.go('/driver');
-        } else {
-          context.go('/home');
-        }
-      } else {
-        setState(() {
-          result = loginResponse["message"] ?? "Google Login failed";
+        final response = await ApiService.post('/api/auth/google-login', {
+          'idToken': idToken,
+          'role': selectedRole,
+          'email': account.email,
+          'name': account.displayName,
+          'avatar': account.photoUrl,
         });
+
+        if (response['success'] == true || response['token'] != null) {
+          final token = response['token']?.toString() ?? '';
+          final userId = (response['user']?['id'] ?? response['userId'])?.toString() ?? '';
+          final userRole = (response['user']?['role'] ?? response['role'])?.toString() ?? selectedRole;
+          final sessionId = response['sessionId']?.toString();
+
+          ApiService.token = token;
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('token', token);
+          await prefs.setString('user_id', userId);
+          await prefs.setString('user_role', userRole);
+
+          SessionService.saveSession(
+            token,
+            userId,
+            userRole,
+            sessionId: sessionId,
+            name: response['user']?['name']?.toString() ?? account.displayName,
+            phone: response['user']?['phone']?.toString() ?? account.email,
+          );
+
+          SocketService.connect(token: token, userId: userId, sessionId: sessionId);
+          SocketService.authenticate(token: token, userId: userId, sessionId: sessionId);
+
+          if (!mounted) return;
+
+          if (userRole == 'driver' || selectedRole == 'driver') {
+            try {
+              await ApiService.toggleDriver(userId, isAvailable: true);
+            } catch (e) {
+              debugPrint("Auto-set online error: $e");
+            }
+            if (!mounted) return;
+            context.go('/captain-home');
+          } else {
+            context.go('/home');
+          }
+        } else {
+          setState(() {
+            result = response['message']?.toString() ?? "Google Sign-In failed";
+          });
+        }
       }
     } catch (e) {
-      print("GOOGLE AUTH ERROR: $e");
+      debugPrint("GOOGLE AUTH ERROR: $e");
       setState(() {
         result = e.toString().replaceFirst("Exception: ", "");
       });
     } finally {
       if (mounted) {
         setState(() {
-          isLoading = false;
+          isGoogleLoading = false;
         });
       }
     }
@@ -635,14 +510,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                   borderRadius: BorderRadius.circular(18),
                                 ),
                               ),
-                              onPressed: isLoading ? null : loginAsGuest,
-                              icon: const Icon(
-                                Icons.person_outline_rounded,
-                                color: AppPalette.primary,
-                                size: 22,
-                              ),
+                              onPressed: (isLoading || isGuestLoading || isGoogleLoading) ? null : loginAsGuest,
+                              icon: isGuestLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.2,
+                                        color: AppPalette.primary,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.person_outline_rounded,
+                                      color: AppPalette.primary,
+                                      size: 22,
+                                    ),
                               label: Text(
-                                isDriver ? "Continue as Guest Driver" : "Continue as Guest Rider",
+                                isGuestLoading
+                                    ? "Logging in as Guest..."
+                                    : (isDriver ? "Continue as Guest Driver" : "Continue as Guest Rider"),
                                 style: const TextStyle(
                                   color: AppPalette.slate900,
                                   fontWeight: FontWeight.w800,
@@ -659,19 +545,28 @@ class _LoginScreenState extends State<LoginScreen> {
                                   borderRadius: BorderRadius.circular(18),
                                 ),
                               ),
-                              onPressed: isLoading ? null : loginWithGoogle,
-                              icon: Image.network(
-                                "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png",
-                                height: 22,
-                                errorBuilder: (context, error, stackTrace) => const Icon(
-                                  Icons.account_circle_rounded,
-                                  color: AppPalette.primary,
-                                  size: 22,
-                                ),
-                              ),
-                              label: const Text(
-                                "Continue with Google",
-                                style: TextStyle(
+                              onPressed: (isLoading || isGuestLoading || isGoogleLoading) ? null : loginWithGoogle,
+                              icon: isGoogleLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.2,
+                                        color: AppPalette.primary,
+                                      ),
+                                    )
+                                  : Image.network(
+                                      "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png",
+                                      height: 22,
+                                      errorBuilder: (context, error, stackTrace) => const Icon(
+                                        Icons.account_circle_rounded,
+                                        color: AppPalette.primary,
+                                        size: 22,
+                                      ),
+                                    ),
+                              label: Text(
+                                isGoogleLoading ? "Connecting to Google..." : "Continue with Google",
+                                style: const TextStyle(
                                   color: AppPalette.slate900,
                                   fontWeight: FontWeight.w800,
                                   fontSize: 15,

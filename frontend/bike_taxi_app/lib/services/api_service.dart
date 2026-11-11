@@ -43,6 +43,23 @@ class ApiService {
     };
   }
 
+  static Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) async {
+    final cleanPath = path.startsWith("/api") ? path.substring(4) : path;
+    final url = cleanPath.startsWith("/") ? "$baseUrl$cleanPath" : "$baseUrl/$cleanPath";
+    final isAuth = cleanPath.contains("auth") || cleanPath.contains("login") || cleanPath.contains("register");
+    final response = await http.post(
+      Uri.parse(url),
+      headers: isAuth
+          ? {
+              "Content-Type": "application/json",
+              "Bypass-Tunnel-Reminder": "true",
+            }
+          : _authHeaders(),
+      body: jsonEncode(body),
+    );
+    return _handleResponse(response, isAuthEndpoint: isAuth);
+  }
+
   static Future<Map<String, dynamic>> login(
     String identifier,
     String password, {
