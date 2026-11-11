@@ -119,11 +119,12 @@ exports.googleLogin = async (req, res) => {
     // Verify token if idToken exists
     if (idToken) {
       try {
+        const googleClientId = process.env.GOOGLE_CLIENT_ID || "57219954065-obscrq1h5ohuaeiclt58msjm7kjmh5v6.apps.googleusercontent.com";
         const { OAuth2Client } = require("google-auth-library");
-        const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+        const client = new OAuth2Client(googleClientId);
         const ticket = await client.verifyIdToken({
           idToken,
-          audience: process.env.GOOGLE_CLIENT_ID
+          audience: googleClientId
         });
         const payload = ticket.getPayload();
         if (payload) {

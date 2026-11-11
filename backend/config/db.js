@@ -5,7 +5,8 @@ const mongoose = require("mongoose");
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/bikeTaxiDB");
+    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://localhost:27017/bikeTaxiDB";
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
 
     console.log("MongoDB Connected");
   } catch (error) {

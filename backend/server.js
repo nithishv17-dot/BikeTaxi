@@ -29,13 +29,26 @@ app.use(express.json());
 
 /* ---------------- DATABASE ---------------- */
 
-mongoose.connect(process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/biketaxi")
-.then(()=>{
-    console.log("MongoDB Connected");
-})
-.catch((err)=>{
-    console.log(err);
-});
+const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+
+if (!mongoUri) {
+  console.error("CRITICAL: Neither MONGODB_URI nor MONGO_URI is defined!");
+  process.exit(1);
+}
+
+const maskedUri = mongoUri.replace(/\/\/([^:]+):([^@]+)@/, "//***:***@");
+console.log(`[DATABASE] Connecting to: ${maskedUri}`);
+
+mongoose
+  .connect(mongoUri, {
+    serverSelectionTimeoutMS: 5000,
+  })
+  .then((conn) => {
+    console.log(`[DATABASE] MongoDB Connected successfully to host: ${conn.connection.host}`);
+  })
+  .catch((err) => {
+    console.error("[DATABASE] MongoDB connection error:", err.message);
+  });
 
 /* ---------------- HEALTH CHECK ---------------- */
 
