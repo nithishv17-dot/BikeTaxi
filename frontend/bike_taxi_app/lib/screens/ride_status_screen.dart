@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:go_router/go_router.dart';
 
@@ -49,23 +51,99 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   LatLng? _captainLocation;
   LatLng? _pickupLocation;
   LatLng? _dropLocation;
+  LatLng? _riderLiveLocation;
+  double _riderHeading = 0.0;
   List<LatLng> _liveRoutePoints = [];
   final MapController _mapController = MapController();
   bool _isMapReady = false;
   double? liveRiderLat;
   double? liveRiderLng;
   Timer? _liveLocationTimer;
+  StreamSubscription<Position>? _positionStreamSubscription;
+  String? _lastRouteKey;
+  String? _lastRouteStatus;
 
   RideMode get rideMode => isNegotiationRide ? RideMode.negotiation : RideMode.normal;
+
+  void _startRiderPositionStream() {
+    if (widget.isDriver) return;
+    try {
+      const locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 3,
+      );
+
+      Geolocator.getCurrentPosition(locationSettings: locationSettings)
+          .then((Position position) {
+        if (!mounted || _riderLiveLocation != null) return;
+        final initialPoint = LatLng(position.latitude, position.longitude);
+        final double initialHeading =
+            (!position.heading.isNaN && position.heading >= 0)
+                ? position.heading
+                : 0.0;
+        setState(() {
+          _riderLiveLocation = initialPoint;
+          liveRiderLat = position.latitude;
+          liveRiderLng = position.longitude;
+          _riderHeading = initialHeading;
+        });
+        SocketService.emitUpdateRiderLocation(
+          widget.rideId,
+          position.latitude,
+          position.longitude,
+        );
+      }).catchError((err) {
+        debugPrint("[Geolocator.getCurrentPosition] error: $err");
+      });
+
+      _positionStreamSubscription?.cancel();
+      _positionStreamSubscription = Geolocator.getPositionStream(
+        locationSettings: locationSettings,
+      ).listen(
+        (Position position) {
+          if (!mounted) return;
+          final nextPoint = LatLng(position.latitude, position.longitude);
+          final double nextHeading =
+              (!position.heading.isNaN && position.heading >= 0)
+                  ? position.heading
+                  : _riderHeading;
+          setState(() {
+            _riderLiveLocation = nextPoint;
+            liveRiderLat = position.latitude;
+            liveRiderLng = position.longitude;
+            _riderHeading = nextHeading;
+          });
+          SocketService.emitUpdateRiderLocation(
+            widget.rideId,
+            position.latitude,
+            position.longitude,
+          );
+        },
+        onError: (err) {
+          debugPrint("[Geolocator.getPositionStream] error: $err");
+        },
+      );
+    } catch (e) {
+      debugPrint("[Geolocator.getPositionStream] setup exception: $e");
+    }
+  }
 
   void _startLiveLocationTracking() {
     _liveLocationTimer?.cancel();
     _liveLocationTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
       if (!mounted) return;
       try {
+        if (!widget.isDriver && _riderLiveLocation != null) {
+          SocketService.emitUpdateRiderLocation(
+            widget.rideId,
+            _riderLiveLocation!.latitude,
+            _riderLiveLocation!.longitude,
+          );
+          return;
+        }
         final pos = await LocationService.getBestCurrentLocation(
           timeout: const Duration(seconds: 3),
-          allowFallback: true,
+          allowFallback: widget.isDriver,
         );
         if (pos != null && pos['lat'] != null && pos['lng'] != null && mounted) {
           final lat = pos['lat']!;
@@ -75,6 +153,13 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             final driverId = session?["userId"] ?? "";
             SocketService.emitUpdateDriverLocation(widget.rideId, driverId, lat, lng);
           } else {
+            if (_riderLiveLocation == null) {
+              setState(() {
+                _riderLiveLocation = LatLng(lat, lng);
+                liveRiderLat = lat;
+                liveRiderLng = lng;
+              });
+            }
             SocketService.emitUpdateRiderLocation(widget.rideId, lat, lng);
           }
         }
@@ -132,12 +217,14 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     super.initState();
     SocketService.emitJoinRide(widget.rideId);
     _startLiveLocationTracking();
+    _startRiderPositionStream();
     fetchRide();
     listenToRideEvents();
   }
 
   @override
   void dispose() {
+    _positionStreamSubscription?.cancel();
     _liveLocationTimer?.cancel();
     _cancelNormalTimeoutTimer();
     countdownTimer?.cancel();
@@ -223,87 +310,84 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
 
   Future<void> _recalculateRouteForCurrentStatus() async {
     final status = ride?["status"]?.toString().toLowerCase() ?? "";
+    final bool isAcceptedOrArriving =
+        status == "accepted" || status == "arriving";
+    final bool isInProgressOrStarted =
+        status == "in_progress" || status == "started" || status == "ongoing";
 
-    if (status == "accepted" || status == "arriving") {
-      final start = _captainLocation ?? (_pickupLocation != null ? LatLng(_pickupLocation!.latitude + 0.005, _pickupLocation!.longitude + 0.005) : null);
-      if (start != null && _pickupLocation != null) {
-        try {
-          final result = await RoutingService.getRoute(
-            start.latitude,
-            start.longitude,
-            _pickupLocation!.latitude,
-            _pickupLocation!.longitude,
-          );
-          if (!mounted) return;
-          if (result != null) {
+    LatLng? start;
+    LatLng? end;
+    bool shouldFrame = false;
+
+    if (isAcceptedOrArriving) {
+      start = _captainLocation;
+      end = _pickupLocation;
+      shouldFrame = true;
+      if (start == null || end == null) {
+        if (_lastRouteStatus != status) {
+          _lastRouteStatus = status;
+          _lastRouteKey = null;
+          if (mounted &&
+              (_liveRoutePoints.isNotEmpty || _roadRoutePoints.isNotEmpty)) {
             setState(() {
-              _liveRoutePoints = result.points;
-              _roadRoutePoints = result.points;
+              _liveRoutePoints = [];
+              _roadRoutePoints = [];
             });
-            _frameCamera(start, _pickupLocation!);
-          } else {
-            setState(() {
-              _liveRoutePoints = [start, _pickupLocation!];
-              _roadRoutePoints = [start, _pickupLocation!];
-            });
-            _frameCamera(start, _pickupLocation!);
           }
-        } catch (_) {}
+        }
+        return;
       }
-    } else if (status == "in_progress" || status == "started") {
-      final start = _captainLocation ?? _pickupLocation;
-      if (start != null && _dropLocation != null) {
-        try {
-          final result = await RoutingService.getRoute(
-            start.latitude,
-            start.longitude,
-            _dropLocation!.latitude,
-            _dropLocation!.longitude,
-          );
-          if (!mounted) return;
-          if (result != null) {
-            setState(() {
-              _liveRoutePoints = result.points;
-              _roadRoutePoints = result.points;
-            });
-            _frameCamera(start, _dropLocation!);
-          } else {
-            setState(() {
-              _liveRoutePoints = [start, _dropLocation!];
-              _roadRoutePoints = [start, _dropLocation!];
-            });
-            _frameCamera(start, _dropLocation!);
-          }
-        } catch (_) {}
-      }
+    } else if (isInProgressOrStarted) {
+      start = _captainLocation ?? _pickupLocation;
+      end = _dropLocation;
+      shouldFrame = true;
     } else {
-      if (_pickupLocation != null && _dropLocation != null && _liveRoutePoints.isEmpty) {
-        try {
-          final result = await RoutingService.getRoute(
-            _pickupLocation!.latitude,
-            _pickupLocation!.longitude,
-            _dropLocation!.latitude,
-            _dropLocation!.longitude,
-          );
-          if (!mounted) return;
-          if (result != null) {
-            setState(() {
-              _liveRoutePoints = result.points;
-              _roadRoutePoints = result.points;
-            });
-          }
-        } catch (_) {}
-      }
+      start = _pickupLocation;
+      end = _dropLocation;
     }
-  }
 
-  void _fetchRoadRoute(double startLat, double startLng, double endLat, double endLng) async {
-    final result = await RoutingService.getRoute(startLat, startLng, endLat, endLng);
-    if (result != null && mounted) {
+    if (start == null || end == null) return;
+    final LatLng routeStart = start;
+    final LatLng routeEnd = end;
+
+    final String nextKey =
+        "$status|${routeStart.latitude.toStringAsFixed(5)},${routeStart.longitude.toStringAsFixed(5)}|${routeEnd.latitude.toStringAsFixed(5)},${routeEnd.longitude.toStringAsFixed(5)}";
+    if (_lastRouteKey == nextKey && _liveRoutePoints.isNotEmpty) {
+      return;
+    }
+    _lastRouteKey = nextKey;
+    _lastRouteStatus = status;
+
+    try {
+      final result = await RoutingService.getRoute(
+        routeStart.latitude,
+        routeStart.longitude,
+        routeEnd.latitude,
+        routeEnd.longitude,
+      );
+      if (!mounted) return;
+      final currentStatus = ride?["status"]?.toString().toLowerCase() ?? "";
+      if (currentStatus != status) return;
+
+      final List<LatLng> points = result?.points ?? [routeStart, routeEnd];
       setState(() {
-        _roadRoutePoints = result.points;
-        _liveRoutePoints = result.points;
+        _liveRoutePoints = points;
+        _roadRoutePoints = points;
       });
+      if (shouldFrame) {
+        _frameCamera(routeStart, routeEnd);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      final currentStatus = ride?["status"]?.toString().toLowerCase() ?? "";
+      if (currentStatus != status) return;
+      setState(() {
+        _liveRoutePoints = [routeStart, routeEnd];
+        _roadRoutePoints = [routeStart, routeEnd];
+      });
+      if (shouldFrame) {
+        _frameCamera(routeStart, routeEnd);
+      }
     }
   }
 
@@ -515,10 +599,18 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       if (rideId != null && rideId != widget.rideId) return;
       final lat = _toDouble(data["lat"]);
       final lng = _toDouble(data["lng"]);
+      final heading = _toDouble(data["heading"]);
       if (mounted && lat != null && lng != null) {
+        if (!widget.isDriver && _riderLiveLocation != null) {
+          return;
+        }
         setState(() {
+          _riderLiveLocation = LatLng(lat, lng);
           liveRiderLat = lat;
           liveRiderLng = lng;
+          if (heading != null && !heading.isNaN && heading >= 0) {
+            _riderHeading = heading;
+          }
         });
       }
     });
@@ -1389,7 +1481,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             child: Row(
               children: [
                 Icon(
-                  status == "ongoing" ? Icons.directions_bike_rounded : Icons.check_circle_rounded,
+                  status == "ongoing" ? Icons.two_wheeler : Icons.check_circle_rounded,
                   color: status == "ongoing" ? const Color(0xFF60A5FA) : const Color(0xFF4ADE80),
                   size: 17,
                 ),
@@ -2104,6 +2196,90 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     );
   }
 
+  Marker _buildCaptainMarker(LatLng point) {
+    return Marker(
+      point: point,
+      width: 44,
+      height: 44,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFFF9800),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2.5),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFF9800).withValues(alpha: 0.45),
+              blurRadius: 12,
+              spreadRadius: 2,
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Icon(
+            Icons.two_wheeler,
+            color: Color(0xFF111827),
+            size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Marker _buildPickupMarker(LatLng point) {
+    return Marker(
+      point: point,
+      width: 44,
+      height: 44,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF10B981),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2.5),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF10B981).withValues(alpha: 0.65),
+              blurRadius: 16,
+              spreadRadius: 3,
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Icon(Icons.location_on_rounded, color: Colors.white, size: 22),
+        ),
+      ),
+    );
+  }
+
+  Marker _buildDropMarker(LatLng point) {
+    return Marker(
+      point: point,
+      width: 44,
+      height: 44,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFE11D48),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2.5),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE11D48).withValues(alpha: 0.65),
+              blurRadius: 16,
+              spreadRadius: 3,
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Icon(Icons.flag_rounded, color: Colors.white, size: 20),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMap(String status) {
     final double pickupLat = _toDouble(ride?["pickupLat"]) ?? 0;
     final double pickupLng = _toDouble(ride?["pickupLng"]) ?? 0;
@@ -2121,254 +2297,110 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       }
     }
 
-    final status = ride?["status"]?.toString().toLowerCase() ?? "";
-    final isAcceptedOrArriving = status == "accepted" || status == "arriving";
-    final isInProgressOrStarted = status == "in_progress" || status == "started";
+    final rideStatus = ride?["status"]?.toString().toLowerCase() ?? status.toLowerCase();
+    final isAcceptedOrArriving = rideStatus == "accepted" || rideStatus == "arriving";
+    final isInProgressOrStarted =
+        rideStatus == "in_progress" || rideStatus == "started" || rideStatus == "ongoing";
 
-    final pickupLatLng = _pickupLocation ?? ((pickupLat != 0.0 && pickupLng != 0.0) ? LatLng(pickupLat, pickupLng) : LatLng(AppConfig.defaultLat, AppConfig.defaultLng));
-    final dropLatLng = _dropLocation ?? ((destinationLat != 0.0 && destinationLng != 0.0) ? LatLng(destinationLat, destinationLng) : pickupLatLng);
+    final pickupLatLng = _pickupLocation ??
+        ((pickupLat != 0.0 && pickupLng != 0.0)
+            ? LatLng(pickupLat, pickupLng)
+            : LatLng(AppConfig.defaultLat, AppConfig.defaultLng));
+    final dropLatLng = _dropLocation ??
+        ((destinationLat != 0.0 && destinationLng != 0.0)
+            ? LatLng(destinationLat, destinationLng)
+            : pickupLatLng);
+
+    final LatLng? riderPoint = _riderLiveLocation ??
+        ((liveRiderLat != null && liveRiderLng != null)
+            ? LatLng(liveRiderLat!, liveRiderLng!)
+            : null);
 
     final routePoints = _liveRoutePoints.isNotEmpty ? _liveRoutePoints : _roadRoutePoints;
     final bool hasRoute = routePoints.length >= 2;
 
-    final LatLng roadPickup = (hasRoute && routePoints.length >= 2) ? routePoints.first : pickupLatLng;
-    final LatLng roadDrop = (hasRoute && routePoints.length >= 2) ? routePoints.last : dropLatLng;
-
-    final bool isPickupOffRoad = hasRoute &&
-        routePoints.length >= 2 &&
-        pickupLat != 0.0 &&
-        const Distance().as(LengthUnit.Meter, pickupLatLng, roadPickup) > 8.0;
-
+    final LatLng roadDrop = (hasRoute && !isAcceptedOrArriving) ? routePoints.last : dropLatLng;
     final bool isDropOffRoad = hasRoute &&
-        routePoints.length >= 2 &&
+        !isAcceptedOrArriving &&
         destinationLat != 0.0 &&
         const Distance().as(LengthUnit.Meter, dropLatLng, roadDrop) > 5.0;
+
+    final LatLng? pickupTarget = _pickupLocation ??
+        ((pickupLat != 0.0 && pickupLng != 0.0) ? LatLng(pickupLat, pickupLng) : null);
+
+    final bool showWalkingToPickup = !isInProgressOrStarted &&
+        rideStatus != "completed" &&
+        rideStatus != "cancelled" &&
+        riderPoint != null &&
+        pickupTarget != null;
 
     final markers = <Marker>[];
 
     if (isAcceptedOrArriving) {
-      // 1. Glowing Amber bike marker at _captainLocation
-      if (_captainLocation != null) {
+      if (_pickupLocation != null) {
+        markers.add(_buildPickupMarker(_pickupLocation!));
+      }
+      if (riderPoint != null) {
         markers.add(
           Marker(
-            point: _captainLocation!,
-            width: 44,
-            height: 44,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFF59E0B).withValues(alpha: 0.65),
-                    blurRadius: 16,
-                    spreadRadius: 3,
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Icon(Icons.pedal_bike_rounded, color: Color(0xFF111827), size: 22),
-              ),
-            ),
+            point: riderPoint,
+            width: 76,
+            height: 76,
+            child: _GoogleMapsRiderPuck(heading: _riderHeading),
           ),
         );
       }
-      // 2. Glowing Emerald pin at _pickupLocation
-      if (_pickupLocation != null) {
-        markers.add(
-          Marker(
-            point: _pickupLocation!,
-            width: 44,
-            height: 44,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.65),
-                    blurRadius: 16,
-                    spreadRadius: 3,
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Icon(Icons.location_on_rounded, color: Colors.white, size: 22),
-              ),
-            ),
-          ),
-        );
+      if (_captainLocation != null) {
+        markers.add(_buildCaptainMarker(_captainLocation!));
       }
     } else if (isInProgressOrStarted) {
-      // 1. Glowing Amber bike marker at _captainLocation
-      if (_captainLocation != null) {
+      if (_dropLocation != null) {
+        markers.add(_buildDropMarker(_dropLocation!));
+      }
+      if (riderPoint != null) {
         markers.add(
           Marker(
-            point: _captainLocation!,
-            width: 44,
-            height: 44,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFF59E0B).withValues(alpha: 0.65),
-                    blurRadius: 16,
-                    spreadRadius: 3,
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Icon(Icons.pedal_bike_rounded, color: Color(0xFF111827), size: 22),
-              ),
-            ),
+            point: riderPoint,
+            width: 76,
+            height: 76,
+            child: _GoogleMapsRiderPuck(heading: _riderHeading),
           ),
         );
       }
-      // 2. Glowing Crimson flag at _dropLocation
-      if (_dropLocation != null) {
-        markers.add(
-          Marker(
-            point: _dropLocation!,
-            width: 44,
-            height: 44,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFE11D48),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFE11D48).withValues(alpha: 0.65),
-                    blurRadius: 16,
-                    spreadRadius: 3,
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Icon(Icons.flag_rounded, color: Colors.white, size: 20),
-              ),
-            ),
-          ),
-        );
+      if (_captainLocation != null) {
+        markers.add(_buildCaptainMarker(_captainLocation!));
       }
     } else {
       if (_pickupLocation != null) {
-        markers.add(
-          Marker(
-            point: _pickupLocation!,
-            width: 44,
-            height: 44,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.6),
-                    blurRadius: 16,
-                    spreadRadius: 3,
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Icon(Icons.location_on_rounded, color: Colors.white, size: 22),
-              ),
-            ),
-          ),
-        );
+        markers.add(_buildPickupMarker(_pickupLocation!));
       }
       if (_dropLocation != null) {
+        markers.add(_buildDropMarker(_dropLocation!));
+      }
+      if (riderPoint != null) {
         markers.add(
           Marker(
-            point: _dropLocation!,
-            width: 44,
-            height: 44,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFE11D48),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFE11D48).withValues(alpha: 0.6),
-                    blurRadius: 16,
-                    spreadRadius: 3,
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Icon(Icons.flag_rounded, color: Colors.white, size: 20),
-              ),
-            ),
+            point: riderPoint,
+            width: 76,
+            height: 76,
+            child: _GoogleMapsRiderPuck(heading: _riderHeading),
           ),
         );
       }
       if (_captainLocation != null) {
-        markers.add(
-          Marker(
-            point: _captainLocation!,
-            width: 40,
-            height: 40,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFF59E0B).withValues(alpha: 0.55),
-                    blurRadius: 14,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Icon(Icons.pedal_bike_rounded, color: Color(0xFF111827), size: 22),
-              ),
-            ),
-          ),
-        );
+        markers.add(_buildCaptainMarker(_captainLocation!));
       }
     }
 
-    if (liveRiderLat != null && liveRiderLng != null) {
-      markers.add(
-        Marker(
-          point: LatLng(liveRiderLat!, liveRiderLng!),
-          width: 42,
-          height: 42,
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2.5),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF3B82F6).withValues(alpha: 0.55),
-                  blurRadius: 14,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: const Center(
-              child: Icon(Icons.person_pin_circle_rounded, color: Colors.white, size: 24),
-            ),
-          ),
-        ),
-      );
-    }
-
     final validPoints = routePoints.where((p) => p.latitude != 0.0 && p.longitude != 0.0).toList();
-    final bounds = hasRoute
+    LatLngBounds? bounds = hasRoute
         ? (validPoints.isNotEmpty
             ? LatLngBounds.fromPoints(validPoints)
             : LatLngBounds.fromPoints([pickupLatLng, dropLatLng]))
         : null;
+    if (bounds == null && isAcceptedOrArriving && _captainLocation != null && _pickupLocation != null) {
+      bounds = LatLngBounds.fromPoints([_captainLocation!, _pickupLocation!]);
+    }
 
     double targetZoom = 14.5;
     LatLng center = LatLng(
@@ -2394,6 +2426,9 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         targetZoom = 11.2;
       }
     }
+
+    final Color activeRouteColor =
+        isAcceptedOrArriving ? const Color(0xFF10B981) : const Color(0xFFFF6B00);
 
     final mapOptions = MapOptions(
       initialCenter: center,
@@ -2437,43 +2472,45 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                     maxZoom: 19,
                   ),
                 ),
-                if (hasRoute)
+                if (hasRoute || showWalkingToPickup)
                   PolylineLayer(
                     polylines: [
-                      // Under-glow Polyline (Layer 1)
-                      Polyline(
-                        points: routePoints,
-                        color: const Color(0xFFFF6B00).withValues(alpha: 0.28),
-                        strokeWidth: 10.0,
-                        strokeCap: StrokeCap.round,
-                        strokeJoin: StrokeJoin.round,
-                      ),
-                      // Main Route Polyline (Layer 2)
-                      Polyline(
-                        points: routePoints,
-                        color: const Color(0xFFFF6B00),
-                        strokeWidth: 5.0,
-                        strokeCap: StrokeCap.round,
-                        strokeJoin: StrokeJoin.round,
-                        borderStrokeWidth: 0.0,
-                      ),
-                      // Pickup Walking Connector (Dotted Cyan)
-                      if (isPickupOffRoad)
+                      if (hasRoute) ...[
+                        // Under-glow Polyline (Layer 1)
                         Polyline(
-                          points: [pickupLatLng, roadPickup],
+                          points: routePoints,
+                          color: activeRouteColor.withValues(alpha: 0.28),
+                          strokeWidth: 10.0,
+                          strokeCap: StrokeCap.round,
+                          strokeJoin: StrokeJoin.round,
+                        ),
+                        // Main Route Polyline (Layer 2)
+                        Polyline(
+                          points: routePoints,
+                          color: activeRouteColor,
+                          strokeWidth: 5.0,
+                          strokeCap: StrokeCap.round,
+                          strokeJoin: StrokeJoin.round,
+                          borderStrokeWidth: 0.0,
+                        ),
+                        // Drop-off Walking Connector (Dotted)
+                        if (isDropOffRoad)
+                          Polyline(
+                            points: [roadDrop, dropLatLng],
+                            color: Colors.white.withValues(alpha: 0.85),
+                            strokeWidth: 3.5,
+                            strokeCap: StrokeCap.round,
+                            pattern: const StrokePattern.dotted(spacingFactor: 1.8),
+                          ),
+                      ],
+                      // Rider Live Location to Pickup Walking Connector (Dotted Cyan)
+                      if (showWalkingToPickup && riderPoint != null && pickupTarget != null)
+                        Polyline(
+                          points: [riderPoint, pickupTarget],
                           color: const Color(0xFF00E5FF),
                           strokeWidth: 3.5,
                           strokeCap: StrokeCap.round,
-                          pattern: const StrokePattern.dotted(spacingFactor: 2.0),
-                        ),
-                      // Drop-off Walking Connector (Dotted)
-                      if (isDropOffRoad)
-                        Polyline(
-                          points: [roadDrop, dropLatLng],
-                          color: Colors.white.withValues(alpha: 0.85),
-                          strokeWidth: 3.5,
-                          strokeCap: StrokeCap.round,
-                          pattern: const StrokePattern.dotted(spacingFactor: 1.8),
+                          pattern: const StrokePattern.dotted(spacingFactor: 2.2),
                         ),
                     ],
                   ),
@@ -2494,10 +2531,10 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B).withOpacity(0.75),
+                      color: const Color(0xFF1E293B).withValues(alpha: 0.75),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.12),
+                        color: Colors.white.withValues(alpha: 0.12),
                         width: 1,
                       ),
                     ),
@@ -2513,7 +2550,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                             letterSpacing: 0.2,
                           ),
                         ),
-                        _buildStatusChip(status),
+                        _buildStatusChip(rideStatus),
                       ],
                     ),
                   ),
@@ -3102,4 +3139,125 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       ),
     );
   }
+}
+
+class _GoogleMapsRiderPuck extends StatefulWidget {
+  final double heading;
+
+  const _GoogleMapsRiderPuck({required this.heading});
+
+  @override
+  State<_GoogleMapsRiderPuck> createState() => _GoogleMapsRiderPuckState();
+}
+
+class _GoogleMapsRiderPuckState extends State<_GoogleMapsRiderPuck>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat(reverse: true);
+    _pulseAnimation = CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double safeHeading =
+        (widget.heading.isNaN || widget.heading < 0) ? 0.0 : widget.heading;
+    final double headingRadians = safeHeading * (math.pi / 180.0);
+
+    return SizedBox(
+      width: 76,
+      height: 76,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Transform.rotate(
+            angle: headingRadians,
+            child: CustomPaint(
+              size: const Size(76, 76),
+              painter: _HeadingConePainter(),
+            ),
+          ),
+          AnimatedBuilder(
+            animation: _pulseAnimation,
+            builder: (context, child) {
+              final double haloSize = 30.0 + (_pulseAnimation.value * 14.0);
+              return Container(
+                width: haloSize,
+                height: haloSize,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2979FF).withValues(alpha: 0.25),
+                  shape: BoxShape.circle,
+                ),
+              );
+            },
+          ),
+          Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: const Color(0xFF2979FF),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3.0),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2979FF).withValues(alpha: 0.45),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.30),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeadingConePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Offset center = Offset(size.width / 2, size.height / 2);
+    final double radius = size.width / 2;
+    const double sweepAngle = 70 * (math.pi / 180.0);
+    const double startAngle = -math.pi / 2 - (sweepAngle / 2);
+
+    final Rect rect = Rect.fromCircle(center: center, radius: radius);
+    final Paint paint = Paint()
+      ..shader = RadialGradient(
+        center: Alignment.center,
+        radius: 0.5,
+        colors: [
+          const Color(0xFF2979FF).withValues(alpha: 0.55),
+          const Color(0xFF2979FF).withValues(alpha: 0.22),
+          const Color(0xFF2979FF).withValues(alpha: 0.0),
+        ],
+        stops: const [0.0, 0.55, 1.0],
+      ).createShader(rect);
+
+    canvas.drawArc(rect, startAngle, sweepAngle, true, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
