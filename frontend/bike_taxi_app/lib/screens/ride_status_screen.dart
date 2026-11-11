@@ -2006,7 +2006,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     final bool isPickupOffRoad = hasRoute &&
         routePoints.length >= 2 &&
         pickupLat != 0.0 &&
-        const Distance().as(LengthUnit.Meter, pickupLatLng, roadPickup) > 5.0;
+        const Distance().as(LengthUnit.Meter, pickupLatLng, roadPickup) > 8.0;
 
     final bool isDropOffRoad = hasRoute &&
         routePoints.length >= 2 &&
@@ -2240,14 +2240,14 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                         strokeJoin: StrokeJoin.round,
                         borderStrokeWidth: 0.0,
                       ),
-                      // Pickup Walking Connector (Dotted)
+                      // Pickup Walking Connector (Dotted Cyan)
                       if (isPickupOffRoad)
                         Polyline(
                           points: [pickupLatLng, roadPickup],
-                          color: Colors.white.withValues(alpha: 0.85),
+                          color: const Color(0xFF00E5FF),
                           strokeWidth: 3.5,
                           strokeCap: StrokeCap.round,
-                          pattern: const StrokePattern.dotted(spacingFactor: 1.8),
+                          pattern: const StrokePattern.dotted(spacingFactor: 2.0),
                         ),
                       // Drop-off Walking Connector (Dotted)
                       if (isDropOffRoad)

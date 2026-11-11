@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -65,6 +66,11 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   double? currentLat;
   double? currentLng;
   double? currentAccuracy;
+
+  LatLng? _riderLivePosition;
+  LatLng? _snappedPickupPoint;
+  StreamSubscription<Position>? _positionStreamSubscription;
+  Timer? _resnapDebounceTimer;
 
   List<LatLng> _roadRoutePoints = [];
   LatLng? _snappedSinglePickup;
@@ -144,6 +150,9 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
     // Step 2: Immediately trigger _initLocation() to fetch fresh browser GPS coordinates.
     _initLocation();
+
+    // Step 3: Subscribe to real-time rider live location tracking
+    _startRiderLiveTracking();
 
     // Local storage ONLY caches non-location preferences (offer_fare, payment method, booking mode)
     _loadFromPrefs().then((_) {
@@ -273,6 +282,8 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
   @override
   void dispose() {
+    _positionStreamSubscription?.cancel();
+    _resnapDebounceTimer?.cancel();
     _stopDriversPolling();
     SocketService.stopListeningDriverLocationUpdated();
     pickupDebounce?.cancel();
@@ -299,6 +310,67 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   void _stopDriversPolling() {
     _driversPollTimer?.cancel();
     _driversPollTimer = null;
+  }
+
+  void _startRiderLiveTracking() {
+    try {
+      const locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 3,
+      );
+
+      _positionStreamSubscription = Geolocator.getPositionStream(
+        locationSettings: locationSettings,
+      ).listen(
+        (Position position) {
+          if (!mounted) return;
+          final newPos = LatLng(position.latitude, position.longitude);
+
+          setState(() {
+            _riderLivePosition = newPos;
+            currentLat = position.latitude;
+            currentLng = position.longitude;
+            currentAccuracy = position.accuracy;
+          });
+
+          // If the rider moves > 15m away from current snapped point, trigger debounce call to re-snap
+          final currentSnap = _snappedPickupPoint;
+          if (currentSnap != null) {
+            final dist = const Distance().as(LengthUnit.Meter, newPos, currentSnap);
+            if (dist > 15.0) {
+              _debouncedResnapPickup(newPos);
+            }
+          } else {
+            _debouncedResnapPickup(newPos);
+          }
+        },
+        onError: (err) {
+          debugPrint("[Geolocator.getPositionStream] error: $err");
+        },
+      );
+    } catch (e) {
+      debugPrint("[Geolocator.getPositionStream] setup exception: $e");
+    }
+  }
+
+  void _debouncedResnapPickup(LatLng riderPos) {
+    _resnapDebounceTimer?.cancel();
+    _resnapDebounceTimer = Timer(const Duration(milliseconds: 500), () async {
+      if (!mounted) return;
+      try {
+        final snapped = await RoutingService.getNearestRoad(riderPos.latitude, riderPos.longitude);
+        if (!mounted) return;
+        if (snapped != null) {
+          setState(() {
+            _snappedPickupPoint = snapped;
+          });
+          // If drop is set, re-fetch driving route starting strictly from _snappedPickupPoint
+          if (dropLat != null && dropLng != null && dropLat != 0.0 && dropLng != 0.0) {
+            _fetchRoadRoute();
+          }
+        }
+      } catch (_) {}
+    });
   }
 
   Future<void> _fetchAvailableDrivers() async {
@@ -353,6 +425,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         currentLat = liveLat;
         currentLng = liveLng;
         currentAccuracy = liveAccuracy;
+        _riderLivePosition = LatLng(liveLat, liveLng);
         currentLocationMessage = null;
       });
 
@@ -365,6 +438,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         try {
           final snappedRoad = await RoutingService.getNearestRoad(liveLat, liveLng);
           if (snappedRoad != null) {
+            _snappedPickupPoint = snappedRoad;
             final distMeters = const Distance().as(LengthUnit.Meter, userCoord, snappedRoad);
             if (distMeters <= 50.0) {
               chosenPickupLat = snappedRoad.latitude;
@@ -483,23 +557,30 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   Future<void> _fetchRoadRoute() async {
     if (pickupLat == null || pickupLng == null || dropLat == null || dropLng == null) return;
     try {
-      final result = await RoutingService.getRoute(pickupLat!, pickupLng!, dropLat!, dropLng!);
+      final startLat = _snappedPickupPoint?.latitude ?? pickupLat!;
+      final startLng = _snappedPickupPoint?.longitude ?? pickupLng!;
+      final result = await RoutingService.getRoute(startLat, startLng, dropLat!, dropLng!);
       if (result != null) {
         setState(() {
           _roadRoutePoints = result.points;
           _apiDistanceKm = result.distanceKm;
           _apiDurationMinutes = result.durationMinutes;
+          if (_snappedPickupPoint == null && result.points.isNotEmpty) {
+            _snappedPickupPoint = result.points.first;
+          }
         });
       } else {
         setState(() {
-          _roadRoutePoints = [LatLng(pickupLat!, pickupLng!), LatLng(dropLat!, dropLng!)];
+          _roadRoutePoints = [LatLng(startLat, startLng), LatLng(dropLat!, dropLng!)];
           _apiDistanceKm = null;
           _apiDurationMinutes = null;
         });
       }
     } catch (e) {
       setState(() {
-        _roadRoutePoints = [LatLng(pickupLat!, pickupLng!), LatLng(dropLat!, dropLng!)];
+        final startLat = _snappedPickupPoint?.latitude ?? pickupLat!;
+        final startLng = _snappedPickupPoint?.longitude ?? pickupLng!;
+        _roadRoutePoints = [LatLng(startLat, startLng), LatLng(dropLat!, dropLng!)];
         _apiDistanceKm = null;
         _apiDurationMinutes = null;
       });
@@ -507,13 +588,16 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   }
 
   void _updateSingleSnap() {
-    if (pickupLat != null && pickupLng != null && pickupLat != 0.0 && pickupLng != 0.0 && (dropLat == null || dropLat == 0.0)) {
+    if (pickupLat != null && pickupLng != null && pickupLat != 0.0 && pickupLng != 0.0) {
       final lat = pickupLat!;
       final lng = pickupLng!;
       RoutingService.getNearestRoad(lat, lng).then((snapped) {
         if (mounted && pickupLat == lat && pickupLng == lng) {
           setState(() {
             _snappedSinglePickup = snapped;
+            if (snapped != null) {
+              _snappedPickupPoint = snapped;
+            }
           });
         }
       });
@@ -1285,24 +1369,36 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         ? LatLng(dropLat!, dropLng!)
         : null;
 
+    final LatLng? riderPos = _riderLivePosition ?? pickupLatLng ?? (currentLat != null && currentLng != null && currentLat != 0.0 && currentLng != 0.0 ? LatLng(currentLat!, currentLng!) : null);
+
+    final LatLng? roadDrop = (dropLatLng != null)
+        ? (_roadRoutePoints.length >= 2 ? _roadRoutePoints.last : (_snappedSingleDrop ?? dropLatLng))
+        : null;
+
+    final LatLng? roadPickup = _snappedPickupPoint ?? ((pickupLatLng != null)
+        ? (_roadRoutePoints.length >= 2 ? _roadRoutePoints.first : (_snappedSinglePickup ?? pickupLatLng))
+        : null);
+
     List<LatLng> polylinePoints = [];
     if (pickupLatLng != null && dropLatLng != null) {
-      polylinePoints = _roadRoutePoints.isNotEmpty
-          ? _roadRoutePoints
-          : [pickupLatLng, dropLatLng];
+      if (_roadRoutePoints.isNotEmpty) {
+        polylinePoints = _roadRoutePoints;
+      } else {
+        final start = roadPickup ?? pickupLatLng;
+        final end = roadDrop ?? dropLatLng;
+        polylinePoints = [start, end];
+      }
     }
 
     final bool hasRoute = polylinePoints.length >= 2;
-    final LatLng? roadPickup = (pickupLatLng != null)
-        ? (hasRoute ? polylinePoints.first : (_snappedSinglePickup ?? pickupLatLng))
-        : null;
-    final LatLng? roadDrop = (dropLatLng != null)
-        ? (hasRoute ? polylinePoints.last : (_snappedSingleDrop ?? dropLatLng))
-        : null;
 
-    final bool isPickupOffRoad = pickupLatLng != null &&
+    final double pickupDistanceToRoad = (riderPos != null && roadPickup != null)
+        ? const Distance().as(LengthUnit.Meter, riderPos, roadPickup)
+        : 0.0;
+
+    final bool isPickupOffRoad = riderPos != null &&
         roadPickup != null &&
-        const Distance().as(LengthUnit.Meter, pickupLatLng, roadPickup) > 5.0;
+        pickupDistanceToRoad > 8.0;
 
     final bool isDropOffRoad = dropLatLng != null &&
         roadDrop != null &&
@@ -1357,15 +1453,15 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           ),
         ),
         // Subtle translucent GPS accuracy pulse/circle
-        if (currentLat != null && currentLng != null && currentLat != 0.0 && currentLng != 0.0)
+        if (riderPos != null)
           CircleLayer(
             circles: [
               CircleMarker(
-                point: LatLng(currentLat!, currentLng!),
+                point: riderPos,
                 radius: (currentAccuracy ?? 25.0).clamp(10.0, 80.0),
                 useRadiusInMeter: true,
-                color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                borderColor: const Color(0xFF10B981).withValues(alpha: 0.38),
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.10),
+                borderColor: const Color(0xFF00E5FF).withValues(alpha: 0.35),
                 borderStrokeWidth: 1.5,
               ),
             ],
@@ -1392,14 +1488,14 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
                   borderStrokeWidth: 0.0,
                 ),
               ],
-              // Pickup Walking Connector (Dotted)
-              if (isPickupOffRoad && pickupLatLng != null && roadPickup != null)
+              // Off-road Walking Connector (Dashed / Dotted Cyan Line)
+              if (isPickupOffRoad && riderPos != null && roadPickup != null)
                 Polyline(
-                  points: [pickupLatLng, roadPickup],
-                  color: Colors.white.withValues(alpha: 0.85),
+                  points: [riderPos, roadPickup],
+                  color: const Color(0xFF00E5FF),
                   strokeWidth: 3.5,
                   strokeCap: StrokeCap.round,
-                  pattern: const StrokePattern.dotted(spacingFactor: 1.8),
+                  pattern: const StrokePattern.dotted(spacingFactor: 2.0),
                 ),
               // Drop-off Walking Connector (Dotted)
               if (isDropOffRoad && dropLatLng != null && roadDrop != null)
@@ -1414,60 +1510,45 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           ),
         MarkerLayer(markers: [
           ...driverMarkers,
-          if (currentLat != null && currentLng != null && currentLat != 0.0 && currentLng != 0.0 && pickupLat == null)
+          // Glowing Cyan Rider Live Location Puck (circular dot with white border and neon cyan drop shadow)
+          if (riderPos != null)
             Marker(
-              point: LatLng(currentLat!, currentLng!),
-              width: 36,
-              height: 36,
+              point: riderPos,
+              width: 38,
+              height: 38,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.22),
+                      color: const Color(0xFF00E5FF).withValues(alpha: 0.22),
                       shape: BoxShape.circle,
                     ),
                   ),
                   Container(
-                    width: 22,
-                    height: 22,
+                    width: 20,
+                    height: 20,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981),
+                      color: const Color(0xFF00E5FF),
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2.8),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.65),
-                          blurRadius: 12,
-                          spreadRadius: 2,
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.85),
+                          blurRadius: 14,
+                          spreadRadius: 3,
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1.5),
                         ),
                       ],
                     ),
                   ),
                 ],
-              ),
-            ),
-          // Off-road Pickup Anchor Dot (if off-road > 5m)
-          if (isPickupOffRoad && pickupLatLng != null)
-            Marker(
-              point: pickupLatLng,
-              width: 14,
-              height: 14,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      blurRadius: 4,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
               ),
             ),
           // Main Glowing Roadside Pickup Badge
