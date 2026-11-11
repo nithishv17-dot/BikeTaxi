@@ -316,6 +316,26 @@ class SocketService {
     socket.off("driverLocationUpdated");
   }
 
+  static void listenRideDriverLocationUpdated(Function callback) {
+    socket.on("driver_location_updated", (data) {
+      callback(data);
+    });
+  }
+
+  static void stopListeningRideDriverLocationUpdated() {
+    socket.off("driver_location_updated");
+  }
+
+  static void driverOnline({required String driverId, double? lat, double? lng}) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit("driver_online", {
+        "driverId": driverId,
+        if (lat != null) "lat": lat,
+        if (lng != null) "lng": lng,
+      });
+    }
+  }
+
   static void removeAllRideListeners() {
     socket.off("rideRequested");
     socket.off("rideAccepted");

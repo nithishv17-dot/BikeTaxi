@@ -8,5 +8,6 @@ router.post("/toggle", authMiddleware, driverController.toggleAvailability);
 router.post("/toggle/:id", authMiddleware, driverController.toggleAvailability);
 router.get("/status", authMiddleware, driverController.getDriverStatus);
 router.get("/status/:id", authMiddleware, driverController.getDriverStatus);
+router.post("/mock-nearby", driverController.mockNearby);
 
 module.exports = router;

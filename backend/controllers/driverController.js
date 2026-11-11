@@ -185,3 +185,105 @@ exports.toggleAvailability = async (req, res) => {
     });
   }
 };
+
+exports.mockNearby = async (req, res) => {
+  try {
+    const lat = Number(req.body.lat) || 11.1401;
+    const lng = Number(req.body.lng) || 79.0786;
+    let count = parseInt(req.body.count, 10);
+    if (isNaN(count) || count < 4 || count > 7) {
+      count = Math.floor(Math.random() * 4) + 4; // Between 4 and 7
+    }
+
+    const bcrypt = require("bcryptjs");
+    const hashedPassword = await bcrypt.hash("mock-captain-pass-2026", 10);
+    const mockDrivers = [];
+    const io = req.app.get("io");
+
+    const names = [
+      "Arun Kumar (Captain)",
+      "Suresh Rider (Captain)",
+      "Karthik Speed (Captain)",
+      "Vignesh Moto (Captain)",
+      "Praveen Swift (Captain)",
+      "Dinesh Express (Captain)",
+      "Vijay Rapid (Captain)"
+    ];
+
+    for (let i = 1; i <= count; i++) {
+      const radiusInDegrees = (0.5 + Math.random()) / 111; // ~500m to 1.5km
+      const angle = Math.random() * 2 * Math.PI;
+      const mockLat = lat + radiusInDegrees * Math.cos(angle);
+      const mockLng = lng + (radiusInDegrees * Math.sin(angle)) / Math.cos(lat * (Math.PI / 180));
+
+      const phone = `+91987654321${i}`;
+      const name = names[i - 1] || `Mock Captain ${i}`;
+
+      const captain = await User.findOneAndUpdate(
+        { phone },
+        {
+          $set: {
+            name,
+            phone,
+            password: hashedPassword,
+            role: "driver",
+            isAvailable: true,
+            location: { lat: mockLat, lng: mockLng },
+            lastActiveAt: new Date(),
+            lastPing: new Date()
+          }
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+
+      try {
+        await Driver.findOneAndUpdate(
+          { phone },
+          {
+            $set: {
+              name,
+              phone,
+              available: true,
+              location: { lat: mockLat, lng: mockLng }
+            }
+          },
+          { upsert: true }
+        );
+      } catch (_) {}
+
+      if (io) {
+        io.emit("driver_status_changed", {
+          driverId: captain._id.toString(),
+          isAvailable: true,
+          location: { lat: mockLat, lng: mockLng }
+        });
+        io.emit("driverLocationUpdated", {
+          driverId: captain._id.toString(),
+          lat: mockLat,
+          lng: mockLng
+        });
+      }
+
+      mockDrivers.push({
+        _id: captain._id,
+        name: captain.name,
+        phone: captain.phone,
+        role: captain.role,
+        isAvailable: captain.isAvailable,
+        location: { lat: mockLat, lng: mockLng }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Spawned ${mockDrivers.length} nearby captains`,
+      drivers: mockDrivers
+    });
+  } catch (error) {
+    console.error("MOCK NEARBY DRIVERS ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to generate mock captains"
+    });
+  }
+};

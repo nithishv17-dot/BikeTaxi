@@ -46,6 +46,12 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   bool normalModeTimeout = false;
   Timer? _normalTimeoutTimer;
   List<LatLng> _roadRoutePoints = [];
+  LatLng? _captainLocation;
+  LatLng? _pickupLocation;
+  LatLng? _dropLocation;
+  List<LatLng> _liveRoutePoints = [];
+  final MapController _mapController = MapController();
+  bool _isMapReady = false;
   double? liveRiderLat;
   double? liveRiderLng;
   Timer? _liveLocationTimer;
@@ -137,6 +143,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     countdownTimer?.cancel();
     SocketService.removeAllRideListeners();
     SocketService.stopListeningDriverLocationUpdated();
+    SocketService.stopListeningRideDriverLocationUpdated();
     SocketService.stopListeningRiderLocationUpdated();
     otpController.dispose();
     super.dispose();
@@ -199,11 +206,103 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     });
   }
 
+  void _frameCamera(LatLng p1, LatLng p2) {
+    if (!_isMapReady) return;
+    try {
+      final bounds = LatLngBounds.fromPoints([p1, p2]);
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.all(40.0),
+        ),
+      );
+    } catch (e) {
+      debugPrint("[RideMap] fitCamera error: $e");
+    }
+  }
+
+  Future<void> _recalculateRouteForCurrentStatus() async {
+    final status = ride?["status"]?.toString().toLowerCase() ?? "";
+
+    if (status == "accepted" || status == "arriving") {
+      final start = _captainLocation ?? (_pickupLocation != null ? LatLng(_pickupLocation!.latitude + 0.005, _pickupLocation!.longitude + 0.005) : null);
+      if (start != null && _pickupLocation != null) {
+        try {
+          final result = await RoutingService.getRoute(
+            start.latitude,
+            start.longitude,
+            _pickupLocation!.latitude,
+            _pickupLocation!.longitude,
+          );
+          if (!mounted) return;
+          if (result != null) {
+            setState(() {
+              _liveRoutePoints = result.points;
+              _roadRoutePoints = result.points;
+            });
+            _frameCamera(start, _pickupLocation!);
+          } else {
+            setState(() {
+              _liveRoutePoints = [start, _pickupLocation!];
+              _roadRoutePoints = [start, _pickupLocation!];
+            });
+            _frameCamera(start, _pickupLocation!);
+          }
+        } catch (_) {}
+      }
+    } else if (status == "in_progress" || status == "started") {
+      final start = _captainLocation ?? _pickupLocation;
+      if (start != null && _dropLocation != null) {
+        try {
+          final result = await RoutingService.getRoute(
+            start.latitude,
+            start.longitude,
+            _dropLocation!.latitude,
+            _dropLocation!.longitude,
+          );
+          if (!mounted) return;
+          if (result != null) {
+            setState(() {
+              _liveRoutePoints = result.points;
+              _roadRoutePoints = result.points;
+            });
+            _frameCamera(start, _dropLocation!);
+          } else {
+            setState(() {
+              _liveRoutePoints = [start, _dropLocation!];
+              _roadRoutePoints = [start, _dropLocation!];
+            });
+            _frameCamera(start, _dropLocation!);
+          }
+        } catch (_) {}
+      }
+    } else {
+      if (_pickupLocation != null && _dropLocation != null && _liveRoutePoints.isEmpty) {
+        try {
+          final result = await RoutingService.getRoute(
+            _pickupLocation!.latitude,
+            _pickupLocation!.longitude,
+            _dropLocation!.latitude,
+            _dropLocation!.longitude,
+          );
+          if (!mounted) return;
+          if (result != null) {
+            setState(() {
+              _liveRoutePoints = result.points;
+              _roadRoutePoints = result.points;
+            });
+          }
+        } catch (_) {}
+      }
+    }
+  }
+
   void _fetchRoadRoute(double startLat, double startLng, double endLat, double endLng) async {
     final result = await RoutingService.getRoute(startLat, startLng, endLat, endLng);
     if (result != null && mounted) {
       setState(() {
         _roadRoutePoints = result.points;
+        _liveRoutePoints = result.points;
       });
     }
   }
@@ -231,9 +330,31 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       final double destinationLng =
           _toDouble(nextRide["dropLng"] ?? nextRide["destinationLng"]) ?? pickupLng;
 
-      if (pickupLat != 0 && destinationLat != 0 && _roadRoutePoints.isEmpty) {
-        _fetchRoadRoute(pickupLat, pickupLng, destinationLat, destinationLng);
+      if (pickupLat != 0 && pickupLng != 0) {
+        _pickupLocation = LatLng(pickupLat, pickupLng);
       }
+      if (destinationLat != 0 && destinationLng != 0) {
+        _dropLocation = LatLng(destinationLat, destinationLng);
+      }
+
+      double? dLat;
+      double? dLng;
+      final driverData = nextRide["driverId"] ?? nextRide["driver"];
+      if (driverData is Map) {
+        final loc = driverData["location"];
+        if (loc is Map) {
+          dLat = _toDouble(loc["lat"]);
+          dLng = _toDouble(loc["lng"]);
+        }
+      }
+      dLat ??= _toDouble(nextRide["driverLat"] ?? nextRide["driverLocation"]?["lat"]);
+      dLng ??= _toDouble(nextRide["driverLng"] ?? nextRide["driverLocation"]?["lng"]);
+
+      if (dLat != null && dLng != null && dLat != 0 && dLng != 0) {
+        _captainLocation = LatLng(dLat, dLng);
+      }
+
+      _recalculateRouteForCurrentStatus();
 
       final status = nextRide["status"]?.toString();
       final paymentStatus = nextRide["paymentStatus"]?.toString();
@@ -345,11 +466,11 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       );
     });
 
-    SocketService.listenDriverLocationUpdated((data) {
-      if (data == null) return;
+    void onDriverLocationReceived(dynamic data) {
+      if (data == null || !mounted) return;
       final driverId = data["driverId"]?.toString() ?? "";
-      final lat = data["lat"];
-      final lng = data["lng"];
+      final lat = _toDouble(data["lat"]);
+      final lng = _toDouble(data["lng"]);
 
       String? currentDriverId;
       if (ride != null && ride!["driverId"] != null) {
@@ -361,25 +482,32 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         }
       }
 
-      if (mounted && driverId.isNotEmpty && currentDriverId == driverId) {
-        setState(() {
-          if (ride != null) {
-            final nextRide = Map<String, dynamic>.from(ride!);
-            if (nextRide["driverId"] is Map) {
-              final driverMap = Map<String, dynamic>.from(nextRide["driverId"]);
-              driverMap["location"] = {"lat": lat, "lng": lng};
-              nextRide["driverId"] = driverMap;
-            } else {
-              nextRide["driverId"] = {
-                "_id": driverId,
-                "location": {"lat": lat, "lng": lng},
-              };
+      if (lat != null && lng != null && lat != 0.0 && lng != 0.0) {
+        if (currentDriverId == null || currentDriverId == driverId) {
+          setState(() {
+            _captainLocation = LatLng(lat, lng);
+            if (ride != null) {
+              final nextRide = Map<String, dynamic>.from(ride!);
+              if (nextRide["driverId"] is Map) {
+                final driverMap = Map<String, dynamic>.from(nextRide["driverId"]);
+                driverMap["location"] = {"lat": lat, "lng": lng};
+                nextRide["driverId"] = driverMap;
+              } else {
+                nextRide["driverId"] = {
+                  "_id": driverId,
+                  "location": {"lat": lat, "lng": lng},
+                };
+              }
+              ride = nextRide;
             }
-            ride = nextRide;
-          }
-        });
+          });
+          _recalculateRouteForCurrentStatus();
+        }
       }
-    });
+    }
+
+    SocketService.listenRideDriverLocationUpdated(onDriverLocationReceived);
+    SocketService.listenDriverLocationUpdated(onDriverLocationReceived);
 
     SocketService.listenRiderLocationUpdated((data) {
       if (data == null) return;
@@ -1984,21 +2112,24 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     final double destinationLng =
         _toDouble(ride?["dropLng"] ?? ride?["destinationLng"]) ?? pickupLng;
 
-    final driverData = ride?["driverId"];
-    final driverMap = driverData is Map ? driverData : null;
-    final double? driverLat = driverMap != null
-        ? _toDouble(driverMap["location"]?["lat"])
-        : null;
-    final double? driverLng = driverMap != null
-        ? _toDouble(driverMap["location"]?["lng"])
-        : null;
+    if (_captainLocation == null && ride?["driverId"] is Map) {
+      final driverMap = ride!["driverId"] as Map;
+      final double? dLat = _toDouble(driverMap["location"]?["lat"]);
+      final double? dLng = _toDouble(driverMap["location"]?["lng"]);
+      if (dLat != null && dLng != null && dLat != 0.0 && dLng != 0.0) {
+        _captainLocation = LatLng(dLat, dLng);
+      }
+    }
 
-    final bool hasRoute = pickupLat != 0.0 && destinationLat != 0.0 && (pickupLat != destinationLat || pickupLng != destinationLng);
-    final pickupLatLng = LatLng(pickupLat, pickupLng);
-    final dropLatLng = LatLng(destinationLat, destinationLng);
-    final routePoints = _roadRoutePoints.isNotEmpty
-        ? _roadRoutePoints
-        : [pickupLatLng, dropLatLng];
+    final status = ride?["status"]?.toString().toLowerCase() ?? "";
+    final isAcceptedOrArriving = status == "accepted" || status == "arriving";
+    final isInProgressOrStarted = status == "in_progress" || status == "started";
+
+    final pickupLatLng = _pickupLocation ?? ((pickupLat != 0.0 && pickupLng != 0.0) ? LatLng(pickupLat, pickupLng) : LatLng(AppConfig.defaultLat, AppConfig.defaultLng));
+    final dropLatLng = _dropLocation ?? ((destinationLat != 0.0 && destinationLng != 0.0) ? LatLng(destinationLat, destinationLng) : pickupLatLng);
+
+    final routePoints = _liveRoutePoints.isNotEmpty ? _liveRoutePoints : _roadRoutePoints;
+    final bool hasRoute = routePoints.length >= 2;
 
     final LatLng roadPickup = (hasRoute && routePoints.length >= 2) ? routePoints.first : pickupLatLng;
     final LatLng roadDrop = (hasRoute && routePoints.length >= 2) ? routePoints.last : dropLatLng;
@@ -2013,121 +2144,196 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         destinationLat != 0.0 &&
         const Distance().as(LengthUnit.Meter, dropLatLng, roadDrop) > 5.0;
 
-    final markers = <Marker>[
-      // Off-road Pickup Anchor Dot (if off-road > 5m)
-      if (isPickupOffRoad)
-        Marker(
-          point: pickupLatLng,
-          width: 14,
-          height: 14,
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF10B981),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 4,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-          ),
-        ),
-      // Main Glowing Roadside Pickup Badge
-      Marker(
-        point: roadPickup,
-        width: 44,
-        height: 44,
-        child: Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF10B981),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2.5),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF10B981).withValues(alpha: 0.6),
-                blurRadius: 16,
-                spreadRadius: 3,
-              ),
-            ],
-          ),
-          child: const Center(
-            child: Icon(Icons.location_on_rounded, color: Colors.white, size: 22),
-          ),
-        ),
-      ),
-      // Off-road Drop-off Anchor Dot (if off-road > 5m)
-      if (isDropOffRoad)
-        Marker(
-          point: dropLatLng,
-          width: 14,
-          height: 14,
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFE11D48),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 4,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-          ),
-        ),
-      // Main Glowing Roadside Drop-off Badge
-      Marker(
-        point: roadDrop,
-        width: 44,
-        height: 44,
-        child: Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFE11D48),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2.5),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFE11D48).withValues(alpha: 0.6),
-                blurRadius: 16,
-                spreadRadius: 3,
-              ),
-            ],
-          ),
-          child: const Center(
-            child: Icon(Icons.flag_rounded, color: Colors.white, size: 20),
-          ),
-        ),
-      ),
-    ];
+    final markers = <Marker>[];
 
-    if (driverLat != null && driverLng != null) {
-      markers.add(
-        Marker(
-          point: LatLng(driverLat, driverLng),
-          width: 40,
-          height: 40,
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFF59E0B),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.55),
-                  blurRadius: 14,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: const Center(
-              child: Icon(Icons.pedal_bike_rounded, color: Color(0xFF111827), size: 22),
+    if (isAcceptedOrArriving) {
+      // 1. Glowing Amber bike marker at _captainLocation
+      if (_captainLocation != null) {
+        markers.add(
+          Marker(
+            point: _captainLocation!,
+            width: 44,
+            height: 44,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.65),
+                    blurRadius: 16,
+                    spreadRadius: 3,
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.pedal_bike_rounded, color: Color(0xFF111827), size: 22),
+              ),
             ),
           ),
-        ),
-      );
+        );
+      }
+      // 2. Glowing Emerald pin at _pickupLocation
+      if (_pickupLocation != null) {
+        markers.add(
+          Marker(
+            point: _pickupLocation!,
+            width: 44,
+            height: 44,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.65),
+                    blurRadius: 16,
+                    spreadRadius: 3,
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.location_on_rounded, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+        );
+      }
+    } else if (isInProgressOrStarted) {
+      // 1. Glowing Amber bike marker at _captainLocation
+      if (_captainLocation != null) {
+        markers.add(
+          Marker(
+            point: _captainLocation!,
+            width: 44,
+            height: 44,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.65),
+                    blurRadius: 16,
+                    spreadRadius: 3,
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.pedal_bike_rounded, color: Color(0xFF111827), size: 22),
+              ),
+            ),
+          ),
+        );
+      }
+      // 2. Glowing Crimson flag at _dropLocation
+      if (_dropLocation != null) {
+        markers.add(
+          Marker(
+            point: _dropLocation!,
+            width: 44,
+            height: 44,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFE11D48),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE11D48).withValues(alpha: 0.65),
+                    blurRadius: 16,
+                    spreadRadius: 3,
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.flag_rounded, color: Colors.white, size: 20),
+              ),
+            ),
+          ),
+        );
+      }
+    } else {
+      if (_pickupLocation != null) {
+        markers.add(
+          Marker(
+            point: _pickupLocation!,
+            width: 44,
+            height: 44,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.6),
+                    blurRadius: 16,
+                    spreadRadius: 3,
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.location_on_rounded, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+        );
+      }
+      if (_dropLocation != null) {
+        markers.add(
+          Marker(
+            point: _dropLocation!,
+            width: 44,
+            height: 44,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFE11D48),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE11D48).withValues(alpha: 0.6),
+                    blurRadius: 16,
+                    spreadRadius: 3,
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.flag_rounded, color: Colors.white, size: 20),
+              ),
+            ),
+          ),
+        );
+      }
+      if (_captainLocation != null) {
+        markers.add(
+          Marker(
+            point: _captainLocation!,
+            width: 40,
+            height: 40,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.55),
+                    blurRadius: 14,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.pedal_bike_rounded, color: Color(0xFF111827), size: 22),
+              ),
+            ),
+          ),
+        );
+      }
     }
 
     if (liveRiderLat != null && liveRiderLng != null) {
@@ -2157,7 +2363,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       );
     }
 
-    final validPoints = _roadRoutePoints.where((p) => p.latitude != 0.0 && p.longitude != 0.0).toList();
+    final validPoints = routePoints.where((p) => p.latitude != 0.0 && p.longitude != 0.0).toList();
     final bounds = hasRoute
         ? (validPoints.isNotEmpty
             ? LatLngBounds.fromPoints(validPoints)
@@ -2194,6 +2400,16 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       initialZoom: targetZoom.clamp(11.0, 16.0),
       minZoom: 11.0,
       maxZoom: 18.0,
+      onMapReady: () {
+        setState(() {
+          _isMapReady = true;
+        });
+        if (isAcceptedOrArriving && _captainLocation != null && _pickupLocation != null) {
+          _frameCamera(_captainLocation!, _pickupLocation!);
+        } else if (isInProgressOrStarted && _captainLocation != null && _dropLocation != null) {
+          _frameCamera(_captainLocation!, _dropLocation!);
+        }
+      },
     );
 
     return SizedBox(
@@ -2203,6 +2419,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         child: Stack(
           children: [
             FlutterMap(
+              mapController: _mapController,
               options: mapOptions,
               children: [
                 ColorFiltered(

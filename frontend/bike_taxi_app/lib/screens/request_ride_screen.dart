@@ -1252,6 +1252,11 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         Positioned(top: topPadding + 78, left: 16, right: 16, child: _buildFloatingLocationCard()),
         if (_phase == _BookingPhase.calculating)
           Positioned(bottom: MediaQuery.of(context).size.height * 0.25 + 8, left: 0, right: 0, child: Center(child: _buildCalculatingPill())),
+        Positioned(
+          bottom: sheetOffset + 16,
+          left: 16,
+          child: _buildMockCaptainsButton(),
+        ),
         if (_isUserPanning || _phase == _BookingPhase.routeReady)
           Positioned(
             bottom: sheetOffset + 16,
@@ -1260,6 +1265,133 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           ),
         _buildDraggableSheet(context),
       ],
+    );
+  }
+
+  bool _isSpawningCaptains = false;
+
+  Future<void> _spawnMockCaptains() async {
+    if (_isSpawningCaptains) return;
+    setState(() {
+      _isSpawningCaptains = true;
+    });
+
+    final targetLat = pickupLat ?? currentLat ?? AppConfig.defaultLat;
+    final targetLng = pickupLng ?? currentLng ?? AppConfig.defaultLng;
+
+    try {
+      final response = await ApiService.post('/api/drivers/mock-nearby', {
+        'lat': targetLat,
+        'lng': targetLng,
+        'count': 5,
+      });
+
+      if (!mounted) return;
+
+      final drivers = List<Map<String, dynamic>>.from(
+        (response["drivers"] as List<dynamic>? ?? const []).whereType<Map>(),
+      );
+
+      if (drivers.isNotEmpty) {
+        setState(() {
+          for (final d in drivers) {
+            final id = d["_id"]?.toString();
+            final existingIdx = availableDrivers.indexWhere((e) => e["_id"]?.toString() == id);
+            if (existingIdx != -1) {
+              availableDrivers[existingIdx] = d;
+            } else {
+              availableDrivers.add(d);
+            }
+          }
+        });
+      }
+
+      final count = drivers.length;
+      final msg = response["message"]?.toString() ?? "Spawned $count nearby captains";
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.two_wheeler_rounded, color: Color(0xFFF59E0B)),
+              const SizedBox(width: 10),
+              Text(msg, style: const TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ),
+          backgroundColor: const Color(0xFF1E293B),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to spawn captains: $e"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSpawningCaptains = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildMockCaptainsButton() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF141616).withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.35)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                blurRadius: 10,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: _isSpawningCaptains ? null : _spawnMockCaptains,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _isSpawningCaptains
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFF59E0B)),
+                          )
+                        : const Icon(Icons.two_wheeler_rounded, color: Color(0xFFF59E0B), size: 18),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Mock Captains",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

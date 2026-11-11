@@ -288,7 +288,11 @@ io.on("connection", async (socket) => {
 
       if (driverId && Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) {
         await User.findByIdAndUpdate(driverId, {
-          $set: { location: { lat, lng } }
+          $set: {
+            location: { lat, lng },
+            lastPing: new Date(),
+            lastActiveAt: new Date()
+          }
         });
 
         try {
@@ -342,16 +346,71 @@ io.on("connection", async (socket) => {
 
   socket.on("disconnect", async () => {
     console.log("User disconnected:", socket.id);
-    if (socket.userId) {
+    const targetUserId = socket.userId || socket.driverId;
+    if (targetUserId) {
       try {
+        const user = await User.findById(targetUserId);
+        if (user && user.role === "driver") {
+          user.isAvailable = false;
+          user.lastActiveAt = new Date();
+          await user.save();
+
+          try {
+            const Driver = require("./models/Driver");
+            await Driver.findOneAndUpdate(
+              { $or: [{ _id: targetUserId }, { phone: user.phone }] },
+              { $set: { available: false } }
+            );
+          } catch (_) {}
+
+          socket.leave("active_drivers");
+          io.emit("driver_status_changed", {
+            driverId: targetUserId.toString(),
+            isAvailable: false
+          });
+          console.log(`[SOCKET] Driver ${targetUserId} auto set offline on disconnect`);
+        }
+
         await User.updateOne(
-          { _id: socket.userId, activeSocketId: socket.id },
+          { _id: targetUserId, activeSocketId: socket.id },
           { $set: { activeSocketId: null } }
         );
-      } catch (_) {}
+      } catch (err) {
+        console.log("[SOCKET] Disconnect cleanup error:", err.message);
+      }
     }
   });
 });
+
+// 30-Second Inactivity & Stale Driver Sweep Watchdog
+setInterval(async () => {
+  try {
+    const staleThreshold = new Date(Date.now() - 90 * 1000); // 90 seconds idle
+    const staleDrivers = await User.find({
+      role: "driver",
+      isAvailable: true,
+      updatedAt: { $lt: staleThreshold }
+    });
+    for (const driver of staleDrivers) {
+      driver.isAvailable = false;
+      driver.lastActiveAt = new Date();
+      await driver.save();
+
+      try {
+        const Driver = require("./models/Driver");
+        await Driver.findOneAndUpdate(
+          { $or: [{ _id: driver._id }, { phone: driver.phone }] },
+          { $set: { available: false } }
+        );
+      } catch (_) {}
+
+      io.emit("driver_status_changed", { driverId: driver._id.toString(), isAvailable: false });
+      console.log(`[INACTIVITY WATCHDOG] Driver ${driver._id} (${driver.name}) set offline due to 90s inactivity`);
+    }
+  } catch (err) {
+    console.log("[INACTIVITY WATCHDOG] Sweep error:", err.message);
+  }
+}, 30000);
 
 setInterval(async () => {
   try {

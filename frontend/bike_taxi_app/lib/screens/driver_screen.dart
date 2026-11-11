@@ -22,7 +22,7 @@ class DriverScreen extends StatefulWidget {
   State<DriverScreen> createState() => _DriverScreenState();
 }
 
-class _DriverScreenState extends State<DriverScreen> {
+class _DriverScreenState extends State<DriverScreen> with WidgetsBindingObserver {
   final TextEditingController rideIdController = TextEditingController();
   final Map<String, TextEditingController> offerControllers = {};
 
@@ -205,6 +205,7 @@ class _DriverScreenState extends State<DriverScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     SocketService.connect();
     final session = SessionService.loadSession();
     if (session != null) {
@@ -322,6 +323,7 @@ class _DriverScreenState extends State<DriverScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _stopRefreshTimer();
     _stopLocationUpdates();
     SocketService.removeAllRideListeners();
@@ -331,6 +333,25 @@ class _DriverScreenState extends State<DriverScreen> {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      SocketService.socket.emit('driver_offline', {'driverId': widget.driverId});
+    } else if (state == AppLifecycleState.resumed) {
+      if (isAvailable) {
+        LocationService.getBestCurrentLocation().then((loc) {
+          if (loc != null && mounted && isAvailable) {
+            SocketService.driverOnline(
+              driverId: widget.driverId,
+              lat: loc['lat'],
+              lng: loc['lng'],
+            );
+          }
+        });
+      }
+    }
   }
 
   Future<void> acceptDirectRide(String rideId) async {

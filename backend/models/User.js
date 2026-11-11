@@ -47,6 +47,14 @@ const userSchema = new mongoose.Schema(
     active_session_token: {
       type: String,
       default: null
+    },
+    lastActiveAt: {
+      type: Date,
+      default: null
+    },
+    lastPing: {
+      type: Date,
+      default: null
     }
   },
   { timestamps: true }
