@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/app_config.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../services/socket_service.dart';
@@ -188,9 +189,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(
-        clientId: kIsWeb
-            ? '57219954065-obscrq1h5ohuaeiclt58msjm7kjmh5v6.apps.googleusercontent.com'
-            : null,
+        clientId: kIsWeb ? AppConfig.googleClientId : null,
         scopes: const ['email', 'profile', 'openid'],
       );
 

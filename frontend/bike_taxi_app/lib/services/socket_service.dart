@@ -22,10 +22,7 @@ class SocketService {
     final effectiveUserId = userId ?? session?['userId'];
     final effectiveSessionId = sessionId ?? session?['sessionId'];
 
-    final apiBase = AppConfig.apiBaseUrl;
-    final socketUrl = apiBase.endsWith("/api")
-        ? apiBase.substring(0, apiBase.length - 4)
-        : apiBase;
+    final socketUrl = AppConfig.socketUrl;
 
     final authMap = <String, dynamic>{};
     if (effectiveToken != null && effectiveToken.isNotEmpty) {

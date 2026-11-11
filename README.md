@@ -178,7 +178,7 @@ Modern GIS frontend built with React, Vite, TypeScript, Tailwind CSS, and `@mapc
 Run the following steps to ensure system health:
 1. Verify API responds to login pre-flight requests:
    ```bash
-   curl.exe -s -X POST https://biketaxi.onrender.com/api/users/login
+   curl.exe -s -X POST https://biketaxi-1.onrender.com/api/users/login
    ```
    *Expected response:* `{"message":"Cannot destructure property 'phone' of 'req.body' as it is undefined."}` (indicating server is up and listening to JSON requests).
 2. Open `https://dottaxi.vercel.app` in Chrome to verify UI dark mode and responsiveness.
