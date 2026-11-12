@@ -79,6 +79,10 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
   double? _apiDurationMinutes;
   List<Map<String, dynamic>> availableDrivers = [];
   Timer? _driversPollTimer;
+  bool _isDemoSimulatorOn = false;
+  Timer? _demoMovementTimer;
+  final Set<String> _simulatedDriverIds = {};
+  final Random _demoRng = Random();
 
   final MapController _mapController = MapController();
   bool _isMapReady = false;
@@ -282,6 +286,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
   @override
   void dispose() {
+    _demoMovementTimer?.cancel();
     _positionStreamSubscription?.cancel();
     _resnapDebounceTimer?.cancel();
     _stopDriversPolling();
@@ -373,6 +378,14 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     });
   }
 
+  bool _isSimulatedDriver(Map<String, dynamic> d) {
+    if (d["isSimulated"] == true) return true;
+    final id = d["_id"]?.toString();
+    if (id != null && _simulatedDriverIds.contains(id)) return true;
+    final phone = d["phone"]?.toString() ?? "";
+    return phone.startsWith("+91987654321");
+  }
+
   Future<void> _fetchAvailableDrivers() async {
     try {
       final response = await ApiService.getDrivers();
@@ -381,8 +394,9 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       );
       if (!mounted) return;
       setState(() {
-        availableDrivers = list.where((d) {
+        final validFetched = list.where((d) {
           if (d["isAvailable"] != true) return false;
+          if (!_isDemoSimulatorOn && _isSimulatedDriver(d)) return false;
           final loc = d["location"];
           if (loc == null) return false;
           final lat = loc["lat"] is num ? (loc["lat"] as num).toDouble() : double.tryParse("${loc["lat"]}");
@@ -390,6 +404,35 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
           if (lat == null || lng == null || lat == 0.0 || lng == 0.0) return false;
           return true;
         }).toList();
+
+        if (_isDemoSimulatorOn) {
+          final existingSimById = <String, Map<String, dynamic>>{};
+          for (final d in availableDrivers) {
+            if (_isSimulatedDriver(d)) {
+              final id = d["_id"]?.toString();
+              if (id != null) existingSimById[id] = d;
+            }
+          }
+          final merged = <Map<String, dynamic>>[];
+          final seenIds = <String>{};
+          for (final d in validFetched) {
+            final id = d["_id"]?.toString() ?? "";
+            seenIds.add(id);
+            if (_isSimulatedDriver(d) && existingSimById.containsKey(id)) {
+              merged.add(existingSimById[id]!);
+            } else {
+              merged.add(d);
+            }
+          }
+          for (final entry in existingSimById.entries) {
+            if (!seenIds.contains(entry.key)) {
+              merged.add(entry.value);
+            }
+          }
+          availableDrivers = merged;
+        } else {
+          availableDrivers = validFetched;
+        }
       });
     } catch (_) {}
   }
@@ -1178,6 +1221,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       final response = await ApiService.requestRide(
         widget.userId, pickupAddress!, pickupLat!, pickupLng!, dropAddress!, dropLat!, dropLng!,
         selectedPaymentMethod, pickupPlaceId, dropPlaceId, bookingMode, finalFare,
+        isDemoMode: _isDemoSimulatorOn,
       );
       if (!mounted) return;
       if (response["ride"] != null && response["ride"]["_id"] != null) {
@@ -1255,7 +1299,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         Positioned(
           bottom: sheetOffset + 16,
           left: 16,
-          child: _buildMockCaptainsButton(),
+          child: _buildDemoSimulatorToggle(),
         ),
         if (_isUserPanning || _phase == _BookingPhase.routeReady)
           Positioned(
@@ -1270,15 +1314,87 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
   bool _isSpawningCaptains = false;
 
-  Future<void> _spawnMockCaptains() async {
+  void _startDemoMovementTimer() {
+    _demoMovementTimer?.cancel();
+    _demoMovementTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || !_isDemoSimulatorOn) return;
+      setState(() {
+        availableDrivers = availableDrivers.map((d) {
+          if (!_isSimulatedDriver(d)) return d;
+          final loc = d["location"];
+          if (loc is! Map) return d;
+          final double? lat = loc["lat"] is num ? (loc["lat"] as num).toDouble() : double.tryParse("${loc["lat"]}");
+          final double? lng = loc["lng"] is num ? (loc["lng"] as num).toDouble() : double.tryParse("${loc["lng"]}");
+          if (lat == null || lng == null) return d;
+          final nextDriver = Map<String, dynamic>.from(d);
+          final dLat = (_demoRng.nextDouble() - 0.5) * 0.00045;
+          final dLng = (_demoRng.nextDouble() - 0.5) * 0.00045;
+          nextDriver["location"] = {
+            "lat": lat + dLat,
+            "lng": lng + dLng,
+          };
+          return nextDriver;
+        }).toList();
+      });
+    });
+  }
+
+  void _stopDemoMovementTimer() {
+    _demoMovementTimer?.cancel();
+    _demoMovementTimer = null;
+  }
+
+  List<Map<String, dynamic>> _buildLocalFallbackCaptains(double baseLat, double baseLng) {
+    const names = [
+      "Arun K. (Captain)",
+      "Suresh R. (Captain)",
+      "Karthik S. (Captain)",
+      "Vignesh M. (Captain)",
+      "Praveen V. (Captain)",
+    ];
+    final cosLat = cos(baseLat * pi / 180.0).abs().clamp(0.2, 1.0);
+    return List.generate(5, (i) {
+      final radiusDeg = (0.5 + _demoRng.nextDouble()) / 111.0;
+      final angle = _demoRng.nextDouble() * 2 * pi;
+      final lat = baseLat + radiusDeg * cos(angle);
+      final lng = baseLng + (radiusDeg * sin(angle)) / cosLat;
+      final id = "mock_captain_${i + 1}";
+      return {
+        "_id": id,
+        "name": names[i],
+        "phone": "+91987654321${i + 1}",
+        "role": "driver",
+        "isAvailable": true,
+        "isSimulated": true,
+        "location": {"lat": lat, "lng": lng},
+      };
+    });
+  }
+
+  Future<void> _toggleDemoSimulator() async {
     if (_isSpawningCaptains) return;
+
+    if (_isDemoSimulatorOn) {
+      _stopDemoMovementTimer();
+      setState(() {
+        _isDemoSimulatorOn = false;
+        availableDrivers.removeWhere((d) => _isSimulatedDriver(d));
+        _simulatedDriverIds.clear();
+      });
+      // Fire-and-forget cleanup on backend so mock captains don't return on poll
+      ApiService.post('/api/drivers/mock-nearby', {'clear': true}).catchError((_) => <String, dynamic>{});
+      return;
+    }
+
     setState(() {
+      _isDemoSimulatorOn = true;
       _isSpawningCaptains = true;
     });
 
     final targetLat = pickupLat ?? currentLat ?? AppConfig.defaultLat;
     final targetLng = pickupLng ?? currentLng ?? AppConfig.defaultLng;
 
+    List<Map<String, dynamic>> spawnedDrivers = [];
     try {
       final response = await ApiService.post('/api/drivers/mock-nearby', {
         'lat': targetLat,
@@ -1286,51 +1402,18 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         'count': 5,
       });
 
-      if (!mounted) return;
+      if (!mounted || !_isDemoSimulatorOn) return;
 
-      final drivers = List<Map<String, dynamic>>.from(
+      spawnedDrivers = List<Map<String, dynamic>>.from(
         (response["drivers"] as List<dynamic>? ?? const []).whereType<Map>(),
-      );
-
-      if (drivers.isNotEmpty) {
-        setState(() {
-          for (final d in drivers) {
-            final id = d["_id"]?.toString();
-            final existingIdx = availableDrivers.indexWhere((e) => e["_id"]?.toString() == id);
-            if (existingIdx != -1) {
-              availableDrivers[existingIdx] = d;
-            } else {
-              availableDrivers.add(d);
-            }
-          }
-        });
-      }
-
-      final count = drivers.length;
-      final msg = response["message"]?.toString() ?? "Spawned $count nearby captains";
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.two_wheeler_rounded, color: Color(0xFFF59E0B)),
-              const SizedBox(width: 10),
-              Text(msg, style: const TextStyle(fontWeight: FontWeight.w600)),
-            ],
-          ),
-          backgroundColor: const Color(0xFF1E293B),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Failed to spawn captains: $e"),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      ).map((d) {
+        final copy = Map<String, dynamic>.from(d);
+        copy["isSimulated"] = true;
+        return copy;
+      }).toList();
+    } catch (_) {
+      if (!mounted || !_isDemoSimulatorOn) return;
+      spawnedDrivers = _buildLocalFallbackCaptains(targetLat, targetLng);
     } finally {
       if (mounted) {
         setState(() {
@@ -1338,56 +1421,129 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         });
       }
     }
+
+    if (!mounted || !_isDemoSimulatorOn) return;
+
+    if (spawnedDrivers.isEmpty) {
+      spawnedDrivers = _buildLocalFallbackCaptains(targetLat, targetLng);
+    }
+
+    setState(() {
+      for (final d in spawnedDrivers) {
+        final id = d["_id"]?.toString();
+        if (id != null && id.isNotEmpty) {
+          _simulatedDriverIds.add(id);
+        }
+        final existingIdx = availableDrivers.indexWhere((e) => e["_id"]?.toString() == id);
+        if (existingIdx != -1) {
+          availableDrivers[existingIdx] = d;
+        } else {
+          availableDrivers.add(d);
+        }
+      }
+    });
+
+    _startDemoMovementTimer();
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.two_wheeler, color: Color(0xFFF59E0B), size: 20),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                "Demo Mode ON: Live Captains & Auto-Negotiation Active",
+                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF141820),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
-  Widget _buildMockCaptainsButton() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF141616).withValues(alpha: 0.85),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.35)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                blurRadius: 10,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
+  Widget _buildDemoSimulatorToggle() {
+    return GestureDetector(
+      onTap: _isSpawningCaptains ? null : _toggleDemoSimulator,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF141820),
               borderRadius: BorderRadius.circular(24),
-              onTap: _isSpawningCaptains ? null : _spawnMockCaptains,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _isSpawningCaptains
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFF59E0B)),
-                          )
-                        : const Icon(Icons.two_wheeler_rounded, color: Color(0xFFF59E0B), size: 18),
-                    const SizedBox(width: 8),
-                    const Text(
-                      "Mock Captains",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        letterSpacing: 0.2,
+              border: Border.all(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.28),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.two_wheeler,
+                  color: Color(0xFFF59E0B),
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeInOut,
+                  width: 42,
+                  height: 24,
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(
+                    color: _isDemoSimulatorOn
+                        ? const Color(0xFFFF7A1A).withValues(alpha: 0.24)
+                        : Colors.grey.shade800,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _isDemoSimulatorOn
+                          ? const Color(0xFFFF7A1A)
+                          : Colors.grey.shade600,
+                      width: 1,
+                    ),
+                  ),
+                  child: AnimatedAlign(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeInOut,
+                    alignment: _isDemoSimulatorOn
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: Container(
+                      width: 17,
+                      height: 17,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _isDemoSimulatorOn
+                            ? const Color(0xFFFF7A1A)
+                            : Colors.grey.shade400,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
@@ -1477,18 +1633,19 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
         height: 40,
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFFF59E0B),
+            color: const Color(0xFFFF9800),
             shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2.0),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFF59E0B).withValues(alpha: 0.55),
-                blurRadius: 14,
+                color: const Color(0xFFFF9800).withValues(alpha: 0.55),
+                blurRadius: 12,
                 spreadRadius: 2,
               ),
             ],
           ),
           child: const Center(
-            child: Icon(Icons.pedal_bike_rounded, color: Color(0xFF111827), size: 22),
+            child: Icon(Icons.two_wheeler, color: Color(0xFF111827), size: 22),
           ),
         ),
       );

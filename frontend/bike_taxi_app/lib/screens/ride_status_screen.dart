@@ -59,6 +59,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   double? liveRiderLat;
   double? liveRiderLng;
   Timer? _liveLocationTimer;
+  Timer? _demoCaptainRouteTimer;
   StreamSubscription<Position>? _positionStreamSubscription;
   String? _lastRouteKey;
   String? _lastRouteStatus;
@@ -224,6 +225,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
 
   @override
   void dispose() {
+    _demoCaptainRouteTimer?.cancel();
     _positionStreamSubscription?.cancel();
     _liveLocationTimer?.cancel();
     _cancelNormalTimeoutTimer();
@@ -377,6 +379,9 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       if (shouldFrame) {
         _frameCamera(routeStart, routeEnd);
       }
+      if (isAcceptedOrArriving) {
+        _startDemoCaptainRouteAnimation();
+      }
     } catch (_) {
       if (!mounted) return;
       final currentStatus = ride?["status"]?.toString().toLowerCase() ?? "";
@@ -388,7 +393,54 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       if (shouldFrame) {
         _frameCamera(routeStart, routeEnd);
       }
+      if (isAcceptedOrArriving) {
+        _startDemoCaptainRouteAnimation();
+      }
     }
+  }
+
+  void _startDemoCaptainRouteAnimation() {
+    final status = ride?["status"]?.toString().toLowerCase() ?? "";
+    final bool isDemo = ride?["isDemoMode"] == true;
+    if (!isDemo || (status != "accepted" && status != "arriving")) {
+      _demoCaptainRouteTimer?.cancel();
+      _demoCaptainRouteTimer = null;
+      return;
+    }
+    if (_demoCaptainRouteTimer != null && _demoCaptainRouteTimer!.isActive) {
+      return;
+    }
+    _demoCaptainRouteTimer =
+        Timer.periodic(const Duration(milliseconds: 1200), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final curStatus = ride?["status"]?.toString().toLowerCase() ?? "";
+      if (curStatus != "accepted" && curStatus != "arriving") {
+        timer.cancel();
+        _demoCaptainRouteTimer = null;
+        return;
+      }
+      if (_liveRoutePoints.length <= 2) {
+        if (_pickupLocation != null) {
+          setState(() {
+            _captainLocation = _pickupLocation;
+          });
+        }
+        timer.cancel();
+        _demoCaptainRouteTimer = null;
+        return;
+      }
+      final int step = (_liveRoutePoints.length / 10).ceil().clamp(1, 3);
+      final int nextIndex = step.clamp(1, _liveRoutePoints.length - 1);
+      final remaining = _liveRoutePoints.sublist(nextIndex);
+      setState(() {
+        _captainLocation = remaining.first;
+        _liveRoutePoints = remaining;
+        _roadRoutePoints = remaining;
+      });
+    });
   }
 
   void _applyRide(Map<String, dynamic>? nextRide, {String? nextMessage}) {
@@ -396,8 +448,22 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
       return;
     }
 
+    List<Map<String, dynamic>>? syncedOffers;
+    if (nextRide != null && nextRide["offers"] is List) {
+      syncedOffers = (nextRide["offers"] as List<dynamic>)
+          .whereType<Map>()
+          .map((o) => Map<String, dynamic>.from(o))
+          .where((o) => o["status"]?.toString() != "rejected")
+          .toList()
+        ..sort((a, b) => ((a["offeredFare"] as num?) ?? 0)
+            .compareTo((b["offeredFare"] as num?) ?? 0));
+    }
+
     setState(() {
       ride = nextRide;
+      if (syncedOffers != null) {
+        offers = syncedOffers;
+      }
       if (nextMessage != null) {
         message = nextMessage;
       }
@@ -436,6 +502,12 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
 
       if (dLat != null && dLng != null && dLat != 0 && dLng != 0) {
         _captainLocation = LatLng(dLat, dLng);
+      }
+
+      final lowerStatus = nextRide["status"]?.toString().toLowerCase() ?? "";
+      if (lowerStatus != "accepted" && lowerStatus != "arriving") {
+        _demoCaptainRouteTimer?.cancel();
+        _demoCaptainRouteTimer = null;
       }
 
       _recalculateRouteForCurrentStatus();
@@ -548,6 +620,50 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         data,
         "Negotiation timed out. Retry negotiation or move to normal booking.",
       );
+    });
+
+    SocketService.listenRideUpdated((data) {
+      handleRideUpdate(data, "Ride updated");
+    });
+
+    SocketService.listenRideCounterOffer((data) {
+      if (!mounted || data == null) return;
+      final dataMap = data is Map ? Map<String, dynamic>.from(data) : null;
+      if (dataMap == null) return;
+      final rideId = _normalizeRideId(dataMap["rideId"] ?? dataMap["ride"]?["_id"]);
+      if (rideId != null && rideId != widget.rideId) return;
+
+      if (dataMap["ride"] is Map) {
+        _applyRide(
+          Map<String, dynamic>.from(dataMap["ride"] as Map),
+          nextMessage: "Captain counter offer received",
+        );
+      } else {
+        setState(() {
+          if (ride != null) {
+            final nextRide = Map<String, dynamic>.from(ride!);
+            nextRide["negotiationStatus"] =
+                dataMap["negotiationStatus"] ?? "countered";
+            if (dataMap["counterOffer"] != null) {
+              nextRide["counterOffer"] = dataMap["counterOffer"];
+            }
+            if (dataMap["captain"] is Map) {
+              nextRide["driverId"] = dataMap["captain"];
+            }
+            ride = nextRide;
+          }
+          if (dataMap["offer"] is Map) {
+            final incomingOffer = Map<String, dynamic>.from(dataMap["offer"] as Map);
+            final incomingId = _normalizeOfferId(incomingOffer["_id"]);
+            final idx = offers.indexWhere((o) => _normalizeOfferId(o["_id"]) == incomingId);
+            if (idx != -1) {
+              offers[idx] = incomingOffer;
+            } else {
+              offers = [...offers, incomingOffer];
+            }
+          }
+        });
+      }
     });
 
     void onDriverLocationReceived(dynamic data) {
@@ -1188,31 +1304,37 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
   Future<void> confirmOffer(String offerId) async {
     setState(() {
       actionLoading = true;
-      message = "Selecting this offer...";
+      message = "Accepting counter offer...";
     });
 
     try {
-      final response = await ApiService.confirmRideOffer(
-        widget.rideId,
-        offerId,
-      );
+      final response = offerId.isNotEmpty
+          ? await ApiService.confirmRideOffer(widget.rideId, offerId)
+          : await ApiService.acceptFare(widget.rideId);
 
       if (!mounted) {
         return;
       }
 
       final successMessage =
-          response["message"]?.toString() ?? "Offer selected successfully";
+          response["message"]?.toString() ?? "Offer accepted successfully";
 
-      setState(() {
-        message = successMessage;
-      });
+      if (response["ride"] is Map) {
+        _applyRide(
+          Map<String, dynamic>.from(response["ride"] as Map),
+          nextMessage: successMessage,
+        );
+      } else {
+        setState(() {
+          message = successMessage;
+        });
+        await fetchRide();
+      }
 
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(successMessage)));
-
-      await fetchRide();
     } catch (e) {
       if (!mounted) {
         return;
@@ -1234,6 +1356,31 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         });
       }
     }
+  }
+
+  Future<void> _declineOffer(String offerId) async {
+    setState(() {
+      actionLoading = true;
+    });
+
+    try {
+      await ApiService.rejectFare(widget.rideId);
+    } catch (_) {
+      // Allow graceful UI decline even if network hiccups in demo mode
+    }
+
+    if (!mounted) return;
+    setState(() {
+      actionLoading = false;
+      offers.removeWhere((o) => _normalizeOfferId(o["_id"]) == offerId);
+      if (ride != null) {
+        final nextRide = Map<String, dynamic>.from(ride!);
+        nextRide["negotiationStatus"] = "rejected";
+        nextRide["counterOffer"] = 0;
+        ride = nextRide;
+      }
+    });
+    _showSnack("Counter offer declined");
   }
 
   String? _rideUserId() {
@@ -1943,202 +2090,254 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                   ],
                 ),
               )
-            else if (offers.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.hourglass_empty_rounded,
-                      size: 40,
-                      color: Colors.grey.shade400,
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      "Waiting for driver offers…",
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              ...offers.map((offer) {
-                final offerId = _normalizeOfferId(offer["_id"]) ?? "";
-                final driverName = offer["driverName"]?.toString() ?? "Captain";
-                final fare = _formatFareToInt(offer["offeredFare"]);
-                final rating = (offer["driverRating"] ?? offer["rating"])?.toString() ?? "4.8";
-                final eta = offer["eta"]?.toString() ?? "~3 min";
-                final initials = driverName.isNotEmpty
-                    ? driverName.trim().split(" ").map((w) => w[0]).take(2).join()
-                    : "C";
+            else ...[
+              Builder(
+                builder: (context) {
+                  final activeOffers = offers
+                      .where((o) => o["status"]?.toString() != "rejected")
+                      .toList();
+                  final counterAmount = _toDouble(ride?["counterOffer"]) ?? 0;
+                  final isCountered =
+                      ride?["negotiationStatus"]?.toString() == "countered" &&
+                          counterAmount > 0;
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.04),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.white.withOpacity(0.09)),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
+                  final List<Map<String, dynamic>> displayOffers =
+                      activeOffers.isNotEmpty
+                          ? activeOffers
+                          : (isCountered
+                              ? [
+                                  {
+                                    "_id": "",
+                                    "driverName": (ride?["driverId"] is Map
+                                            ? ride!["driverId"]["name"]
+                                            : null) ??
+                                        "Arun K. (Captain)",
+                                    "offeredFare": counterAmount,
+                                    "rating": "4.8",
+                                    "eta": "~3 min",
+                                  }
+                                ]
+                              : <Map<String, dynamic>>[]);
+
+                  if (displayOffers.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Column(
                         children: [
-                          Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              color: AppPalette.primary.withOpacity(0.18),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppPalette.primary.withOpacity(0.35),
-                                width: 1.5,
-                              ),
+                          Icon(
+                            Icons.hourglass_empty_rounded,
+                            size: 40,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            ride?["negotiationStatus"]?.toString() == "rejected"
+                                ? "Offer declined. Waiting for another captain..."
+                                : "Waiting for driver offers…",
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w600,
                             ),
-                            child: Center(
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: displayOffers.map((offer) {
+                      final offerId = _normalizeOfferId(offer["_id"]) ?? "";
+                      final driverName =
+                          offer["driverName"]?.toString() ?? "Arun K. (Captain)";
+                      final wholeFare =
+                          (_toDouble(offer["offeredFare"]) ?? 0).round().toString();
+                      final rating =
+                          (offer["driverRating"] ?? offer["rating"])?.toString() ??
+                              "4.8";
+                      final eta = offer["eta"]?.toString() ?? "~3 min";
+                      final initials = driverName.isNotEmpty
+                          ? driverName
+                              .trim()
+                              .split(" ")
+                              .where((w) => w.isNotEmpty)
+                              .map((w) => w[0])
+                              .take(2)
+                              .join()
+                          : "C";
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF141820).withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.45),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                               child: Text(
-                                initials.toUpperCase(),
+                                "Captain Counter Offer: ₹$wholeFare",
                                 style: const TextStyle(
-                                  color: AppPalette.primary,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 18,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFB45309),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            const SizedBox(height: 12),
+                            Row(
                               children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: AppPalette.primary.withValues(alpha: 0.18),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: AppPalette.primary.withValues(alpha: 0.35),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      initials.toUpperCase(),
+                                      style: const TextStyle(
+                                        color: AppPalette.primary,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 17,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        driverName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 15,
+                                          color: AppPalette.slate900,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.star_rounded,
+                                            color: Color(0xFFF59E0B),
+                                            size: 14,
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            rating,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 13,
+                                              color: AppPalette.slate700,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          const Icon(
+                                            Icons.access_time_rounded,
+                                            color: AppPalette.slate700,
+                                            size: 13,
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            eta,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                              color: AppPalette.slate700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
                                 Text(
-                                  driverName,
+                                  "₹$wholeFare",
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 15,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
                                     color: AppPalette.slate900,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.star_rounded,
-                                      color: Color(0xFFF59E0B),
-                                      size: 14,
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      rating,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13,
-                                        color: AppPalette.slate700,
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      foregroundColor: Colors.redAccent,
+                                      side: const BorderSide(
+                                        color: Colors.redAccent,
+                                        width: 1.2,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
-                                    const Icon(
-                                      Icons.access_time_rounded,
-                                      color: AppPalette.slate700,
-                                      size: 13,
+                                    onPressed: actionLoading
+                                        ? null
+                                        : () => _declineOffer(offerId),
+                                    child: const Text(
+                                      "Decline",
+                                      style: TextStyle(fontWeight: FontWeight.w700),
                                     ),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      eta,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                        color: AppPalette.slate700,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  flex: 2,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      backgroundColor: const Color(0xFF10B981),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
+                                      elevation: 0,
                                     ),
-                                  ],
+                                    onPressed: actionLoading
+                                        ? null
+                                        : () => confirmOffer(offerId),
+                                    child: Text(
+                                      "Accept ₹$wholeFare",
+                                      style: const TextStyle(fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              const Text(
-                                "Counter offer",
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppPalette.slate700,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                "₹ $fare",
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppPalette.slate900,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                foregroundColor: Colors.redAccent,
-                                side: const BorderSide(
-                                  color: Colors.redAccent,
-                                  width: 1,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              onPressed: actionLoading
-                                  ? null
-                                  : () {
-                                      setState(() {
-                                        offers.removeWhere(
-                                          (o) => _normalizeOfferId(o["_id"]) == offerId,
-                                        );
-                                      });
-                                    },
-                              child: const Text("Reject"),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            flex: 2,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                backgroundColor: AppPalette.primary,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 0,
-                              ),
-                              onPressed: actionLoading || offerId.isEmpty
-                                  ? null
-                                  : () => confirmOffer(offerId),
-                              child: const Text(
-                                "Accept Offer",
-                                style: TextStyle(fontWeight: FontWeight.w800),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ],
           ],
         ],
       ),

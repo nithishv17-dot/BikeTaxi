@@ -6,6 +6,7 @@ import 'session_service.dart';
 
 class SocketService {
   static io_client.Socket? _socket;
+  static String? _activeRideRoomId;
 
   static io_client.Socket get socket {
     if (_socket == null) {
@@ -76,6 +77,9 @@ class SocketService {
           userId: currentSession['userId'],
           sessionId: currentSession['sessionId'],
         );
+      }
+      if (_activeRideRoomId != null && _activeRideRoomId!.isNotEmpty) {
+        _socket!.emit("join_ride", {"rideId": _activeRideRoomId});
       }
     });
 
@@ -219,6 +223,18 @@ class SocketService {
     });
   }
 
+  static void listenRideCounterOffer(Function callback) {
+    socket.on("ride_counter_offer", (data) {
+      callback(data);
+    });
+  }
+
+  static void listenRideUpdated(Function callback) {
+    socket.on("ride_updated", (data) {
+      callback(data);
+    });
+  }
+
   static void emitDriverOnline(String driverId, double lat, double lng) {
     if (_socket != null && _socket!.connected) {
       _socket!.emit("driver_online", {
@@ -250,8 +266,11 @@ class SocketService {
   }
 
   static void emitJoinRide(String rideId) {
+    _activeRideRoomId = rideId;
     if (_socket != null && _socket!.connected) {
       _socket!.emit("join_ride", {"rideId": rideId});
+    } else {
+      connect();
     }
   }
 
@@ -337,6 +356,7 @@ class SocketService {
   }
 
   static void removeAllRideListeners() {
+    _activeRideRoomId = null;
     socket.off("rideRequested");
     socket.off("rideAccepted");
     socket.off("rideStarted");
@@ -347,5 +367,7 @@ class SocketService {
     socket.off("negotiationOfferAcceptedByUser");
     socket.off("negotiationClosed");
     socket.off("negotiationExpired");
+    socket.off("ride_counter_offer");
+    socket.off("ride_updated");
   }
 }

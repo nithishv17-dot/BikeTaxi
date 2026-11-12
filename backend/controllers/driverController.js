@@ -188,17 +188,50 @@ exports.toggleAvailability = async (req, res) => {
 
 exports.mockNearby = async (req, res) => {
   try {
+    const io = req.app.get("io");
+    if (req.body.clear === true) {
+      const mockUsers = await User.find({
+        role: "driver",
+        phone: { $regex: /^\+91987654321/ }
+      }).select("_id phone");
+
+      await User.updateMany(
+        { role: "driver", phone: { $regex: /^\+91987654321/ } },
+        { $set: { isAvailable: false } }
+      );
+      try {
+        await Driver.updateMany(
+          { phone: { $regex: /^\+91987654321/ } },
+          { $set: { available: false } }
+        );
+      } catch (_) {}
+
+      if (io) {
+        for (const u of mockUsers) {
+          io.emit("driver_status_changed", {
+            driverId: u._id.toString(),
+            isAvailable: false
+          });
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Cleared simulated captains",
+        drivers: []
+      });
+    }
+
     const lat = Number(req.body.lat) || 11.1401;
     const lng = Number(req.body.lng) || 79.0786;
     let count = parseInt(req.body.count, 10);
     if (isNaN(count) || count < 4 || count > 7) {
-      count = Math.floor(Math.random() * 4) + 4; // Between 4 and 7
+      count = 5;
     }
 
     const bcrypt = require("bcryptjs");
     const hashedPassword = await bcrypt.hash("mock-captain-pass-2026", 10);
     const mockDrivers = [];
-    const io = req.app.get("io");
 
     const names = [
       "Arun Kumar (Captain)",

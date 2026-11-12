@@ -218,6 +218,168 @@ const ensureRideIsActionable = async (req, rideId) => {
   return { ride, io };
 };
 
+const getOrCreateDemoCaptain = async (pickupLat, pickupLng, excludeIds = []) => {
+  let demoCaptain = await User.findOne({
+    role: "driver",
+    isAvailable: true,
+    _id: { $nin: excludeIds },
+    phone: { $regex: /^\+91987654321/ }
+  });
+
+  if (!demoCaptain) {
+    demoCaptain = await User.findOne({
+      role: "driver",
+      isAvailable: true,
+      _id: { $nin: excludeIds }
+    });
+  }
+
+  const fallbackLat = Number(pickupLat) + 0.0055;
+  const fallbackLng = Number(pickupLng) + 0.0045;
+
+  if (!demoCaptain) {
+    const bcrypt = require("bcryptjs");
+    const hashedPassword = await bcrypt.hash("mock-captain-pass-2026", 10);
+    demoCaptain = await User.findOneAndUpdate(
+      { phone: "+919876543211" },
+      {
+        $set: {
+          name: "Arun K. (Captain)",
+          phone: "+919876543211",
+          password: hashedPassword,
+          role: "driver",
+          isAvailable: true,
+          location: { lat: fallbackLat, lng: fallbackLng },
+          lastActiveAt: new Date(),
+          lastPing: new Date()
+        }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  } else if (
+    !demoCaptain.location ||
+    !Number.isFinite(Number(demoCaptain.location.lat)) ||
+    Number(demoCaptain.location.lat) === 0
+  ) {
+    demoCaptain.location = { lat: fallbackLat, lng: fallbackLng };
+    await demoCaptain.save();
+  }
+
+  return demoCaptain;
+};
+
+const scheduleDemoCounterOffer = (rideId, io) => {
+  setTimeout(async () => {
+    try {
+      const latestRide = await Ride.findById(rideId);
+      if (!latestRide || latestRide.status !== "negotiating") {
+        return;
+      }
+
+      const demoCaptain = await getOrCreateDemoCaptain(
+        latestRide.pickupLat,
+        latestRide.pickupLng
+      );
+
+      const baseOffer = Number(
+        latestRide.offeredFare || latestRide.estimatedFare || 35
+      );
+      const counterFare = Math.max(
+        Math.round(baseOffer * 1.18),
+        Math.round(baseOffer) + 1
+      );
+
+      const existingIdx = latestRide.offers.findIndex(
+        (offer) => offer.driverId.toString() === demoCaptain._id.toString()
+      );
+      if (existingIdx !== -1) {
+        latestRide.offers[existingIdx].offeredFare = counterFare;
+        latestRide.offers[existingIdx].status = "pending";
+        latestRide.offers[existingIdx].driverName =
+          demoCaptain.name || "Arun K. (Captain)";
+      } else {
+        latestRide.offers.push({
+          driverId: demoCaptain._id,
+          driverName: demoCaptain.name || "Arun K. (Captain)",
+          driverPhone: demoCaptain.phone || "+919876543211",
+          offeredFare: counterFare,
+          status: "pending"
+        });
+      }
+
+      latestRide.negotiationStatus = "countered";
+      latestRide.counterOffer = counterFare;
+      latestRide.driverId = demoCaptain._id;
+      await latestRide.save();
+
+      const populatedRide = await getPopulatedRide(latestRide._id);
+      const createdOffer =
+        latestRide.offers[latestRide.offers.length - 1];
+
+      if (io) {
+        const payload = {
+          rideId: latestRide._id.toString(),
+          ride: populatedRide,
+          offer: createdOffer,
+          counterOffer: counterFare,
+          negotiationStatus: "countered",
+          captain: {
+            _id: demoCaptain._id.toString(),
+            name: demoCaptain.name || "Arun K. (Captain)",
+            phone: demoCaptain.phone || "",
+            location: demoCaptain.location
+          }
+        };
+        io.to(`ride_${latestRide._id}`).emit("ride_counter_offer", payload);
+        io.to(`user_${latestRide.userId}`).emit("ride_counter_offer", payload);
+        io.to(`ride_${latestRide._id}`).emit("ride_updated", populatedRide);
+        io.to(`user_${latestRide.userId}`).emit("ride_updated", populatedRide);
+        io.emit("negotiationOfferSubmitted", {
+          rideId: latestRide._id,
+          offer: createdOffer
+        });
+      }
+    } catch (err) {
+      console.error("[DEMO COUNTER OFFER ERROR]:", err.message);
+    }
+  }, 2500);
+};
+
+const scheduleDemoNormalAccept = (rideId, io) => {
+  setTimeout(async () => {
+    try {
+      const latestRide = await Ride.findById(rideId);
+      if (!latestRide || latestRide.status !== "requested") {
+        return;
+      }
+
+      let driver = latestRide.driverId
+        ? await User.findById(latestRide.driverId)
+        : null;
+      if (!driver) {
+        driver = await getOrCreateDemoCaptain(
+          latestRide.pickupLat,
+          latestRide.pickupLng
+        );
+      }
+
+      latestRide.driverId = driver._id;
+      latestRide.status = "accepted";
+      latestRide.otp = Math.floor(1000 + Math.random() * 9000).toString();
+      await latestRide.save();
+
+      const refreshedRide = await getPopulatedRide(latestRide._id);
+      if (io && refreshedRide) {
+        io.to(`ride_${latestRide._id}`).emit("ride_updated", refreshedRide);
+        io.to(`user_${latestRide.userId}`).emit("ride_updated", refreshedRide);
+        io.emit("rideAccepted", refreshedRide);
+      }
+    } catch (err) {
+      console.error("[DEMO NORMAL ACCEPT ERROR]:", err.message);
+    }
+  }, 2500);
+};
+
 exports.requestRide = async (req, res) => {
   try {
     const io = req.app.get("io");
@@ -340,16 +502,30 @@ exports.requestRide = async (req, res) => {
       onlineDrivers: await User.find({ role: "driver", isAvailable: true }).lean()
     });
 
-    const availableDrivers = await User.find({
+    const rawDemoMode = req.body.isDemoMode;
+    const isDemoMode =
+      rawDemoMode === true ||
+      (rawDemoMode !== false && requestedBookingMode === "negotiation");
+
+    let availableDrivers = await User.find({
       role: "driver",
       isAvailable: true,
       _id: { $nin: busyDriverIds }
     });
 
     if (!availableDrivers.length) {
-      return res.status(404).json({
-        message: "No drivers available"
-      });
+      if (isDemoMode) {
+        const virtualCaptain = await getOrCreateDemoCaptain(
+          pickupLatitude,
+          pickupLongitude,
+          busyDriverIds
+        );
+        availableDrivers = [virtualCaptain];
+      } else {
+        return res.status(404).json({
+          message: "No drivers available"
+        });
+      }
     }
 
     const estimatedFare =
@@ -360,6 +536,9 @@ exports.requestRide = async (req, res) => {
         dropLatitude,
         dropLongitude
       ));
+    const offeredFare =
+      parseFare(req.body.offeredFare ?? req.body.estimatedFare ?? req.body.fare) ??
+      estimatedFare;
 
     const ridePayload = {
       userId: extractedUserId,
@@ -376,10 +555,11 @@ exports.requestRide = async (req, res) => {
       paymentMethod: requestedPaymentMethod,
       paymentStatus: "Pending",
       bookingMode: requestedBookingMode,
+      isDemoMode: Boolean(isDemoMode),
       otp: "",
       estimatedFare,
       initialFare: estimatedFare,
-      offeredFare: estimatedFare,
+      offeredFare,
       finalFare: requestedBookingMode === "normal" ? estimatedFare : 0
     };
 
@@ -396,6 +576,10 @@ exports.requestRide = async (req, res) => {
 
       await ride.save();
       io.emit("negotiationRideRequested", ride);
+
+      if (isDemoMode) {
+        scheduleDemoCounterOffer(ride._id, io);
+      }
 
       return res.status(201).json({
         message: "Negotiation ride created successfully",
@@ -442,6 +626,10 @@ exports.requestRide = async (req, res) => {
     }
 
     io.emit("rideRequested", ride);
+
+    if (rawDemoMode === true) {
+      scheduleDemoNormalAccept(ride._id, io);
+    }
 
     return res.status(201).json({
       message: "Ride requested successfully. Waiting for driver confirmation.",
@@ -985,13 +1173,7 @@ exports.confirmRideOffer = async (req, res) => {
       req.params.id
     );
     let ride = actionableRide;
-    const { offerId } = req.body;
-    const extractedOfferId = extractObjectId(offerId);
-    if (!extractedOfferId || !mongoose.Types.ObjectId.isValid(extractedOfferId)) {
-      return res.status(400).json({
-        message: "Invalid or malformed offer id"
-      });
-    }
+    const { offerId } = req.body || {};
 
     if (!ride) {
       return res.status(404).json({
@@ -1005,49 +1187,76 @@ exports.confirmRideOffer = async (req, res) => {
       });
     }
 
-    const selectedOffer = ride.offers.id(extractedOfferId);
+    let selectedOffer = null;
+    let extractedOfferId = offerId ? extractObjectId(offerId) : null;
 
-    if (!selectedOffer) {
+    if (extractedOfferId) {
+      if (!mongoose.Types.ObjectId.isValid(extractedOfferId)) {
+        return res.status(400).json({
+          message: "Invalid or malformed offer id"
+        });
+      }
+      selectedOffer = ride.offers.id(extractedOfferId);
+    } else if (ride.offers && ride.offers.length > 0) {
+      selectedOffer =
+        [...ride.offers].reverse().find((o) => o.status === "pending") ||
+        ride.offers[ride.offers.length - 1];
+      extractedOfferId = selectedOffer?._id?.toString();
+    }
+
+    let acceptedDriverId = selectedOffer?.driverId || ride.driverId;
+    let acceptedFare =
+      selectedOffer?.offeredFare || ride.counterOffer || ride.offeredFare;
+
+    if (!selectedOffer && !(ride.counterOffer > 0 && acceptedDriverId)) {
       return res.status(404).json({
         message: "Offer not found"
       });
     }
 
-    markOffersClosed(ride, extractedOfferId);
-    ride.driverId = selectedOffer.driverId;
+    if (extractedOfferId) {
+      markOffersClosed(ride, extractedOfferId);
+    }
+    ride.driverId = acceptedDriverId;
     ride.status = "accepted";
     ride.negotiationStatus = "accepted";
-    ride.finalFare = selectedOffer.offeredFare;
-    ride.offeredFare = selectedOffer.offeredFare;
+    ride.finalFare = acceptedFare;
+    ride.offeredFare = acceptedFare;
     ride.negotiationExpiresAt = null;
     ride.otp = Math.floor(1000 + Math.random() * 9000).toString();
     await ride.save();
 
-    const driver = await User.findById(selectedOffer.driverId);
+    const driver = acceptedDriverId
+      ? await User.findById(acceptedDriverId)
+      : null;
     if (driver) {
       driver.isAvailable = false;
       await driver.save();
     }
-    try {
-      await Driver.findOneAndUpdate(
-        { $or: [{ _id: selectedOffer.driverId }, { phone: driver?.phone }] },
-        { $set: { available: false } }
-      );
-    } catch (_) {}
+    if (acceptedDriverId) {
+      try {
+        await Driver.findOneAndUpdate(
+          { $or: [{ _id: acceptedDriverId }, { phone: driver?.phone }] },
+          { $set: { available: false } }
+        );
+      } catch (_) {}
 
-    io.to(`driver_${selectedOffer.driverId}`).emit("driver_availability_changed", {
-      driverId: selectedOffer.driverId.toString(),
-      isAvailable: false
-    });
-    io.emit("driver_status_changed", {
-      driverId: selectedOffer.driverId.toString(),
-      isAvailable: false
-    });
+      io.to(`driver_${acceptedDriverId}`).emit("driver_availability_changed", {
+        driverId: acceptedDriverId.toString(),
+        isAvailable: false
+      });
+      io.emit("driver_status_changed", {
+        driverId: acceptedDriverId.toString(),
+        isAvailable: false
+      });
+    }
 
     const refreshedRide = await Ride.findById(ride._id)
       .populate("userId", "name phone")
       .populate("driverId", "name phone location");
 
+    io.to(`ride_${ride._id}`).emit("ride_updated", refreshedRide);
+    io.to(`user_${ride.userId}`).emit("ride_updated", refreshedRide);
     io.emit("negotiationOfferAcceptedByUser", refreshedRide);
     io.emit("negotiationClosed", refreshedRide);
     io.emit("rideAccepted", refreshedRide);
@@ -1070,7 +1279,7 @@ exports.acceptFare = async (req, res) => exports.confirmRideOffer(req, res);
 
 exports.rejectFare = async (req, res) => {
   try {
-    const { ride } = await ensureRideIsActionable(req, req.params.id);
+    const { ride, io } = await ensureRideIsActionable(req, req.params.id);
 
     if (!ride) {
       return res.status(404).json({
@@ -1078,12 +1287,23 @@ exports.rejectFare = async (req, res) => {
       });
     }
 
+    markOffersClosed(ride);
     ride.negotiationStatus = "rejected";
+    ride.counterOffer = 0;
+    if (ride.status === "negotiating") {
+      ride.driverId = null;
+    }
     await ride.save();
+
+    const refreshedRide = await getPopulatedRide(ride._id);
+    if (io && refreshedRide) {
+      io.to(`ride_${ride._id}`).emit("ride_updated", refreshedRide);
+      io.to(`user_${ride.userId}`).emit("ride_updated", refreshedRide);
+    }
 
     return res.status(200).json({
       message: "Offer rejected successfully",
-      ride
+      ride: refreshedRide || ride
     });
   } catch (error) {
     console.log("REJECT FARE ERROR:", error);

@@ -131,6 +131,14 @@ const rideSchema = new mongoose.Schema(
       ],
       default: "none"
     },
+    counterOffer: {
+      type: Number,
+      default: 0
+    },
+    isDemoMode: {
+      type: Boolean,
+      default: false
+    },
     negotiationExpiresAt: {
       type: Date,
       default: null

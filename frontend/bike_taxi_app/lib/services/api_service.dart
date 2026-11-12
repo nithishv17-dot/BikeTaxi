@@ -343,8 +343,9 @@ class ApiService {
     String? pickupPlaceId,
     String? dropPlaceId,
     String bookingMode,
-    double estimatedFare,
-  ) async {
+    double estimatedFare, {
+    bool isDemoMode = false,
+  }) async {
     final response = await http.post(
       Uri.parse("$baseUrl/rides/request"),
       headers: _authHeaders(),
@@ -363,6 +364,8 @@ class ApiService {
         "paymentMethod": paymentMethod,
         "bookingMode": bookingMode,
         "estimatedFare": estimatedFare,
+        "offeredFare": estimatedFare,
+        "isDemoMode": isDemoMode,
       }),
     );
 
