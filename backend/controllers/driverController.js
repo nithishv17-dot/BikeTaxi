@@ -225,8 +225,8 @@ exports.mockNearby = async (req, res) => {
     const lat = Number(req.body.lat) || 11.1401;
     const lng = Number(req.body.lng) || 79.0786;
     let count = parseInt(req.body.count, 10);
-    if (isNaN(count) || count < 4 || count > 7) {
-      count = 5;
+    if (isNaN(count) || count < 1 || count > 15) {
+      count = 6 + Math.floor(Math.random() * 5); // 6 to 10 random captains
     }
 
     const bcrypt = require("bcryptjs");
@@ -234,23 +234,26 @@ exports.mockNearby = async (req, res) => {
     const mockDrivers = [];
 
     const names = [
-      "Arun Kumar (Captain)",
-      "Suresh Rider (Captain)",
-      "Karthik Speed (Captain)",
-      "Vignesh Moto (Captain)",
-      "Praveen Swift (Captain)",
-      "Dinesh Express (Captain)",
-      "Vijay Rapid (Captain)"
+      "Arun K. (Captain)",
+      "Suresh R. (Captain)",
+      "Karthik S. (Captain)",
+      "Vignesh M. (Captain)",
+      "Praveen V. (Captain)",
+      "Dinesh P. (Captain)",
+      "Vijay N. (Captain)",
+      "Manoj T. (Captain)",
+      "Rahul B. (Captain)",
+      "Deepak G. (Captain)"
     ];
 
-    for (let i = 1; i <= count; i++) {
-      const radiusInDegrees = (0.5 + Math.random()) / 111; // ~500m to 1.5km
+    for (let i = 0; i < count; i++) {
+      const radiusInDegrees = (0.45 + Math.random() * 1.1) / 111; // ~450m to 1.55km
       const angle = Math.random() * 2 * Math.PI;
       const mockLat = lat + radiusInDegrees * Math.cos(angle);
       const mockLng = lng + (radiusInDegrees * Math.sin(angle)) / Math.cos(lat * (Math.PI / 180));
 
       const phone = `+91987654321${i}`;
-      const name = names[i - 1] || `Mock Captain ${i}`;
+      const name = names[i % names.length] || `Mock Captain ${i + 1}`;
 
       const captain = await User.findOneAndUpdate(
         { phone },

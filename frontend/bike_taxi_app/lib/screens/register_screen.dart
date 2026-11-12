@@ -1,6 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/app_config.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../services/socket_service.dart';
@@ -21,8 +25,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String message = "";
   bool isLoading = false;
+  bool isGuestLoading = false;
+  bool isGoogleLoading = false;
   bool obscurePassword = true;
   bool isDriver = false;
+
+  String get selectedRole => isDriver ? "driver" : "rider";
 
   void registerUser() async {
     if (nameController.text.trim().isEmpty ||
@@ -70,257 +78,153 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  void loginWithGoogle() async {
+  void loginAsGuest() async {
     setState(() {
-      isLoading = true;
+      isGuestLoading = true;
       message = "";
     });
 
-    final selectedAccount = await showDialog<Map<String, String>>(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Image.network(
-                      "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png",
-                      height: 24,
-                      errorBuilder: (c, e, s) => const Icon(Icons.g_mobiledata_rounded, color: AppPalette.primary, size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      "Sign in with Google",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  "Choose an account to continue to RideGo",
-                  style: TextStyle(
-                    color: AppPalette.slate500,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: AppPalette.primary,
-                    child: Text("NK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  title: const Text("Nithish Kumar", style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text("nithish.kumar@gmail.com"),
-                  onTap: () => Navigator.pop(context, {
-                    "email": "nithish.kumar@gmail.com",
-                    "name": "Nithish Kumar",
-                    "role": isDriver ? "driver" : "user",
-                  }),
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFF3B82F6),
-                    child: Text("GR", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  title: Row(
-                    children: [
-                      const Text("Guest Rider", style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3B82F6).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text("RIDER", style: TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  subtitle: const Text("guest.rider@gmail.com"),
-                  onTap: () => Navigator.pop(context, {
-                    "email": "guest.rider@gmail.com",
-                    "name": "Guest Rider",
-                    "role": "user",
-                  }),
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFF10B981),
-                    child: Text("GD", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  title: Row(
-                    children: [
-                      const Text("Guest Driver", style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text("CAPTAIN", style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  subtitle: const Text("guest.driver@gmail.com"),
-                  onTap: () => Navigator.pop(context, {
-                    "email": "guest.driver@gmail.com",
-                    "name": "Guest Driver",
-                    "role": "driver",
-                  }),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
-    if (selectedAccount == null) {
-      setState(() {
-        isLoading = false;
-      });
-      return;
-    }
-
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 28, vertical: 22),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: AppPalette.primary),
-                SizedBox(width: 18),
-                Text(
-                  "Connecting to Google...",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    await Future.delayed(const Duration(seconds: 1));
-    if (!mounted) return;
-    Navigator.pop(context); // Close connecting dialog
-
-    final selectedEmail = selectedAccount["email"]!;
-    final targetRole = selectedAccount["role"] ?? (isDriver ? "driver" : "user");
-    final mockName = selectedAccount["name"] ?? (selectedEmail.split("@").first + " (Google)");
-    final mockIdentifier = selectedEmail; // email acts as phone/identifier
-    const mockPassword = "google-sign-in-password-auth";
-
     try {
-      Map<String, dynamic> loginResponse;
-      String actualRole = targetRole;
+      final role = selectedRole;
+      final response = await ApiService.post('/api/auth/guest-login', {
+        'role': role,
+      });
 
-      try {
-        loginResponse = await ApiService.login(
-          mockIdentifier,
-          mockPassword,
-          role: targetRole,
-        );
-        actualRole = loginResponse["role"]?.toString() ?? targetRole;
-      } catch (loginErr) {
-        final errStr = loginErr.toString();
-        if (errStr.contains("User not found")) {
-          await ApiService.register(
-            mockName,
-            mockIdentifier,
-            mockPassword,
-            role: targetRole,
-          );
-          loginResponse = await ApiService.login(
-            mockIdentifier,
-            mockPassword,
-            role: targetRole,
-          );
-          actualRole = loginResponse["role"]?.toString() ?? targetRole;
-        } else if (errStr.contains("This account is not a driver account") && targetRole != "driver") {
-          loginResponse = await ApiService.login(
-            mockIdentifier,
-            mockPassword,
-            role: "user",
-          );
-          actualRole = "user";
-        } else {
-          rethrow;
-        }
-      }
+      if (response['token'] != null) {
+        final token = response['token']?.toString() ?? '';
+        final userId = (response['user']?['id'] ?? response['userId'])?.toString() ?? '';
+        final userRole = (response['user']?['role'] ?? response['role'])?.toString() ?? role;
+        final sessionId = response['sessionId']?.toString();
 
-      if (loginResponse["message"] == "Login successful" &&
-          loginResponse["token"] != null &&
-          loginResponse["userId"] != null) {
-        ApiService.token = loginResponse["token"];
-        final sessionId = loginResponse["sessionId"]?.toString();
+        ApiService.token = token;
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', token);
+        await prefs.setString('user_id', userId);
+        await prefs.setString('user_role', userRole);
+
         SessionService.saveSession(
-          loginResponse["token"],
-          loginResponse["userId"],
-          actualRole,
+          token,
+          userId,
+          userRole,
           sessionId: sessionId,
-          name: loginResponse["name"]?.toString(),
-          phone: loginResponse["phone"]?.toString(),
+          name: response['user']?['name']?.toString() ?? response['name']?.toString(),
+          phone: response['user']?['phone']?.toString() ?? response['phone']?.toString(),
         );
 
-        SocketService.connect(
-          token: loginResponse["token"],
-          userId: loginResponse["userId"],
-          sessionId: sessionId,
-        );
-        SocketService.authenticate(
-          token: loginResponse["token"],
-          userId: loginResponse["userId"],
-          sessionId: sessionId,
-        );
+        SocketService.connect(token: token, userId: userId, sessionId: sessionId);
+        SocketService.authenticate(token: token, userId: userId, sessionId: sessionId);
 
         if (!mounted) return;
 
-        if (actualRole == "driver") {
+        if (userRole == 'driver' || role == 'driver') {
           try {
-            await ApiService.toggleDriver(loginResponse["userId"], isAvailable: true);
+            await ApiService.toggleDriver(userId, isAvailable: true);
           } catch (e) {
-            print("Auto-set online error: $e");
+            debugPrint("Auto-set online error: $e");
           }
           if (!mounted) return;
-          context.go('/driver');
+          context.go('/captain-home');
         } else {
           context.go('/home');
         }
       } else {
         setState(() {
-          message = loginResponse["message"] ?? "Google Login failed";
+          message = response['message']?.toString() ?? "Guest login failed";
         });
       }
     } catch (e) {
-      print("GOOGLE AUTH ERROR: $e");
+      debugPrint("GUEST LOGIN ERROR: $e");
       setState(() {
         message = e.toString().replaceFirst("Exception: ", "");
       });
     } finally {
       if (mounted) {
         setState(() {
-          isLoading = false;
+          isGuestLoading = false;
+        });
+      }
+    }
+  }
+
+  void loginWithGoogle() async {
+    setState(() {
+      isGoogleLoading = true;
+      message = "";
+    });
+
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        clientId: kIsWeb ? AppConfig.googleClientId : null,
+        scopes: const ['email', 'profile', 'openid'],
+      );
+
+      final GoogleSignInAccount? account = await googleSignIn.signIn();
+      if (account != null) {
+        final GoogleSignInAuthentication auth = await account.authentication;
+        final String? idToken = auth.idToken;
+
+        final response = await ApiService.post('/api/auth/google-login', {
+          'idToken': idToken,
+          'role': selectedRole,
+          'email': account.email,
+          'name': account.displayName,
+          'avatar': account.photoUrl,
+        });
+
+        if (response['success'] == true || response['token'] != null) {
+          final token = response['token']?.toString() ?? '';
+          final userId = (response['user']?['id'] ?? response['userId'])?.toString() ?? '';
+          final userRole = (response['user']?['role'] ?? response['role'])?.toString() ?? selectedRole;
+          final sessionId = response['sessionId']?.toString();
+
+          ApiService.token = token;
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('token', token);
+          await prefs.setString('user_id', userId);
+          await prefs.setString('user_role', userRole);
+
+          SessionService.saveSession(
+            token,
+            userId,
+            userRole,
+            sessionId: sessionId,
+            name: response['user']?['name']?.toString() ?? account.displayName,
+            phone: response['user']?['phone']?.toString() ?? account.email,
+          );
+
+          SocketService.connect(token: token, userId: userId, sessionId: sessionId);
+          SocketService.authenticate(token: token, userId: userId, sessionId: sessionId);
+
+          if (!mounted) return;
+
+          if (userRole == 'driver' || selectedRole == 'driver') {
+            try {
+              await ApiService.toggleDriver(userId, isAvailable: true);
+            } catch (e) {
+              debugPrint("Auto-set online error: $e");
+            }
+            if (!mounted) return;
+            context.go('/captain-home');
+          } else {
+            context.go('/home');
+          }
+        } else {
+          setState(() {
+            message = response['message']?.toString() ?? "Google Sign-In failed";
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("GOOGLE AUTH ERROR: $e");
+      setState(() {
+        message = e.toString().replaceFirst("Exception: ", "");
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isGoogleLoading = false;
         });
       }
     }
@@ -344,113 +248,76 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(22, 18, 22, 26),
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
+                constraints: const BoxConstraints(maxWidth: 440),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    RevealMotion(
-                      delay: const Duration(milliseconds: 40),
-                      beginOffset: const Offset(0, -0.1),
-                      child: ReflectiveBanner(
-                        colors: const [AppPalette.primary, AppPalette.secondary],
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: const [
-                                  Icon(
-                                    Icons.person_add_alt_1_rounded,
-                                    color: Colors.white,
-                                    size: 34,
-                                  ),
-                                  SizedBox(height: 14),
-                                  Text(
-                                    "DotTaxi",
-                                    style: TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                      letterSpacing: -0.3,
-                                    ),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    "Create your account and unlock smooth city rides with real-time control.",
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10, bottom: 14),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF4A261).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            const SizedBox(width: 16),
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.24),
-                                  width: 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.25),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(15),
-                                child: Image.asset(
-                                  "assets/icon/app_icon.jpg",
-                                  width: 72,
-                                  height: 72,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
+                            child: const Icon(
+                              Icons.two_wheeler_rounded,
+                              size: 20,
+                              color: Color(0xFFF4A261),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            "Dottaxi",
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 16),
                     RevealMotion(
-                      delay: const Duration(milliseconds: 140),
+                      delay: const Duration(milliseconds: 80),
                       child: ReflectionCard(
-                        padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
+                        padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
                               "Create Account",
                               textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.headlineMedium
+                              style: Theme.of(context).textTheme.headlineSmall
                                   ?.copyWith(
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: -0.2,
                                   ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 4),
                             const Text(
                               "Set up your profile and start booking in seconds.",
                               textAlign: TextAlign.center,
                               style: TextStyle(
+                                fontSize: 12.5,
                                 color: AppPalette.slate500,
                                 fontWeight: FontWeight.w600,
-                                height: 1.4,
+                                height: 1.3,
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 10),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 ChoiceChip(
                                   label: const Text("Rider"),
+                                  visualDensity: VisualDensity.compact,
                                   selected: !isDriver,
                                   onSelected: (selected) {
                                     setState(() {
@@ -458,9 +325,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     });
                                   },
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 10),
                                 ChoiceChip(
                                   label: const Text("Driver"),
+                                  visualDensity: VisualDensity.compact,
                                   selected: isDriver,
                                   onSelected: (selected) {
                                     setState(() {
@@ -470,32 +338,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 22),
+                            const SizedBox(height: 10),
                             TextField(
                               controller: nameController,
                               textInputAction: TextInputAction.next,
                               decoration: const InputDecoration(
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(
+                                  vertical: 13,
+                                  horizontal: 16,
+                                ),
                                 labelText: "Name",
                                 hintText: "Enter full name",
                                 prefixIcon: Icon(Icons.person_rounded),
                               ),
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 10),
                             TextField(
                               controller: phoneController,
                               keyboardType: TextInputType.phone,
                               textInputAction: TextInputAction.next,
                               decoration: const InputDecoration(
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(
+                                  vertical: 13,
+                                  horizontal: 16,
+                                ),
                                 labelText: "Phone",
                                 hintText: "Enter mobile number",
                                 prefixIcon: Icon(Icons.phone_rounded),
                               ),
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 10),
                             TextField(
                               controller: passwordController,
                               obscureText: obscurePassword,
                               decoration: InputDecoration(
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 13,
+                                  horizontal: 16,
+                                ),
                                 labelText: "Password",
                                 hintText: "Create password",
                                 prefixIcon: const Icon(Icons.lock_rounded),
@@ -513,20 +396,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 12),
                             AnimatedContainer(
                               duration: const Duration(milliseconds: 250),
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(18),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppPalette.primary.withOpacity(isLoading ? 0.18 : 0.28),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
+                                    color: AppPalette.primary.withValues(alpha: isLoading ? 0.18 : 0.28),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 8),
                                   ),
                                 ],
                               ),
                               child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size(double.infinity, 44),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                ),
                                 onPressed: isLoading ? null : registerUser,
                                 child: AnimatedSwitcher(
                                   duration: const Duration(milliseconds: 220),
@@ -547,8 +434,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 4),
                             TextButton(
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                              ),
                               onPressed: () {
                                 context.go('/login');
                               },
@@ -556,75 +448,118 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 "Already have an account? Login",
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 4),
                             Row(
                               children: [
-                                Expanded(child: Divider(color: AppPalette.slate300.withOpacity(0.5))),
+                                Expanded(child: Divider(color: AppPalette.slate300.withValues(alpha: 0.5))),
                                 const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 12),
+                                  padding: EdgeInsets.symmetric(horizontal: 10),
                                   child: Text(
                                     "OR",
                                     style: TextStyle(
                                       color: AppPalette.slate500,
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 12,
+                                      fontSize: 11,
                                     ),
                                   ),
                                 ),
-                                Expanded(child: Divider(color: AppPalette.slate300.withOpacity(0.5))),
+                                Expanded(child: Divider(color: AppPalette.slate300.withValues(alpha: 0.5))),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(double.infinity, 54),
-                                side: BorderSide(color: AppPalette.slate300.withOpacity(0.7)),
+                                minimumSize: const Size(double.infinity, 44),
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                side: BorderSide(color: AppPalette.slate300.withValues(alpha: 0.7)),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
-                              onPressed: isLoading ? null : loginWithGoogle,
-                              icon: Image.network(
-                                "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png",
-                                height: 22,
-                                errorBuilder: (context, error, stackTrace) => const Icon(
-                                  Icons.account_circle_rounded,
-                                  color: AppPalette.primary,
-                                  size: 22,
-                                ),
-                              ),
-                              label: const Text(
-                                "Continue with Google",
-                                style: TextStyle(
+                              onPressed: (isLoading || isGuestLoading || isGoogleLoading) ? null : loginAsGuest,
+                              icon: isGuestLoading
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.2,
+                                        color: AppPalette.primary,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.person_outline_rounded,
+                                      color: AppPalette.primary,
+                                      size: 20,
+                                    ),
+                              label: Text(
+                                isGuestLoading
+                                    ? "Logging in as Guest..."
+                                    : (isDriver ? "Continue as Guest Driver" : "Continue as Guest Rider"),
+                                style: const TextStyle(
                                   color: AppPalette.slate900,
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 15,
+                                  fontSize: 14,
                                 ),
                               ),
                             ),
-
+                            const SizedBox(height: 8),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 44),
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                side: BorderSide(color: AppPalette.slate300.withValues(alpha: 0.7)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              onPressed: (isLoading || isGuestLoading || isGoogleLoading) ? null : loginWithGoogle,
+                              icon: isGoogleLoading
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.2,
+                                        color: AppPalette.primary,
+                                      ),
+                                    )
+                                  : Image.network(
+                                      "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png",
+                                      height: 20,
+                                      errorBuilder: (context, error, stackTrace) => const Icon(
+                                        Icons.account_circle_rounded,
+                                        color: AppPalette.primary,
+                                        size: 20,
+                                      ),
+                                    ),
+                              label: Text(
+                                isGoogleLoading ? "Connecting to Google..." : "Continue with Google",
+                                style: const TextStyle(
+                                  color: AppPalette.slate900,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
                             AnimatedSwitcher(
                               duration: const Duration(milliseconds: 280),
                               child: message.isEmpty
                                   ? const SizedBox.shrink()
                                   : Padding(
-                                      padding: const EdgeInsets.only(top: 10),
+                                      padding: const EdgeInsets.only(top: 8),
                                       child: Container(
-                                        padding: const EdgeInsets.all(14),
+                                        padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.05),
-                                          borderRadius: BorderRadius.circular(
-                                            16,
-                                          ),
+                                          color: Colors.white.withValues(alpha: 0.05),
+                                          borderRadius: BorderRadius.circular(14),
                                           border: Border.all(
-                                            color: Colors.white.withOpacity(0.1),
+                                            color: Colors.white.withValues(alpha: 0.1),
                                           ),
                                         ),
                                         child: Text(
                                           message,
                                           textAlign: TextAlign.center,
                                           style: const TextStyle(
-                                            fontSize: 14,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.w600,
                                             color: AppPalette.slate900,
                                           ),

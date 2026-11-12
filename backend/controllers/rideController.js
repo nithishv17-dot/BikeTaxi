@@ -268,81 +268,137 @@ const getOrCreateDemoCaptain = async (pickupLat, pickupLng, excludeIds = []) => 
   return demoCaptain;
 };
 
-const scheduleDemoCounterOffer = (rideId, io) => {
-  setTimeout(async () => {
-    try {
-      const latestRide = await Ride.findById(rideId);
-      if (!latestRide || latestRide.status !== "negotiating") {
-        return;
+const scheduleDemoCounterOffers = (rideId, io) => {
+  const demoCaptainTemplates = [
+    { name: "Arun K. (Captain)", phone: "+919876543210" },
+    { name: "Suresh R. (Captain)", phone: "+919876543211" },
+    { name: "Karthik S. (Captain)", phone: "+919876543212" },
+    { name: "Vignesh M. (Captain)", phone: "+919876543213" },
+    { name: "Praveen V. (Captain)", phone: "+919876543214" },
+    { name: "Dinesh P. (Captain)", phone: "+919876543215" }
+  ];
+
+  const offerCount = 4 + Math.floor(Math.random() * 3); // 4 to 6 offers
+
+  for (let i = 0; i < offerCount; i++) {
+    setTimeout(async () => {
+      try {
+        const latestRide = await Ride.findById(rideId);
+        if (!latestRide || latestRide.status !== "negotiating") {
+          return;
+        }
+
+        const tpl = demoCaptainTemplates[i % demoCaptainTemplates.length];
+        const radiusDeg = (0.4 + Math.random() * 1.0) / 111;
+        const angle = Math.random() * 2 * Math.PI;
+        const offsetLat = latestRide.pickupLat + radiusDeg * Math.cos(angle);
+        const offsetLng =
+          latestRide.pickupLng +
+          (radiusDeg * Math.sin(angle)) /
+            Math.max(0.2, Math.abs(Math.cos(latestRide.pickupLat * (Math.PI / 180))));
+
+        let demoCaptain = await User.findOne({ phone: tpl.phone, role: "driver" });
+        if (!demoCaptain) {
+          const bcrypt = require("bcryptjs");
+          const hashedPassword = await bcrypt.hash("mock-captain-pass-2026", 10);
+          demoCaptain = await User.findOneAndUpdate(
+            { phone: tpl.phone },
+            {
+              $set: {
+                name: tpl.name,
+                phone: tpl.phone,
+                password: hashedPassword,
+                role: "driver",
+                isAvailable: true,
+                location: { lat: offsetLat, lng: offsetLng },
+                lastActiveAt: new Date(),
+                lastPing: new Date()
+              }
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+          );
+        } else if (
+          !demoCaptain.location ||
+          !Number.isFinite(Number(demoCaptain.location.lat)) ||
+          Number(demoCaptain.location.lat) === 0
+        ) {
+          demoCaptain.location = { lat: offsetLat, lng: offsetLng };
+          await demoCaptain.save();
+        }
+
+        const baseOffer = Number(
+          latestRide.offeredFare || latestRide.estimatedFare || 35
+        );
+        const multiplier = 1.0 + Math.random() * 0.25; // offeredFare to offeredFare * 1.25
+        const counterFare = Math.max(
+          Math.round(baseOffer * multiplier),
+          Math.round(baseOffer)
+        );
+        const driverRating = Number((4.6 + Math.random() * 0.3).toFixed(1)); // 4.6 - 4.9
+        const etaMins = 2 + Math.floor(Math.random() * 5); // 2 - 6 min
+        const eta = `${etaMins} min`;
+
+        const existingIdx = latestRide.offers.findIndex(
+          (offer) => offer.driverId.toString() === demoCaptain._id.toString()
+        );
+        if (existingIdx !== -1) {
+          latestRide.offers[existingIdx].offeredFare = counterFare;
+          latestRide.offers[existingIdx].driverRating = driverRating;
+          latestRide.offers[existingIdx].eta = eta;
+          latestRide.offers[existingIdx].status = "pending";
+          latestRide.offers[existingIdx].driverName =
+            demoCaptain.name || tpl.name;
+        } else {
+          latestRide.offers.push({
+            driverId: demoCaptain._id,
+            driverName: demoCaptain.name || tpl.name,
+            driverPhone: demoCaptain.phone || tpl.phone,
+            offeredFare: counterFare,
+            driverRating,
+            eta,
+            status: "pending"
+          });
+        }
+
+        latestRide.negotiationStatus = "countered";
+        latestRide.counterOffer = counterFare;
+        if (!latestRide.driverId) {
+          latestRide.driverId = demoCaptain._id;
+        }
+        await latestRide.save();
+
+        const populatedRide = await getPopulatedRide(latestRide._id);
+        const createdOffer =
+          latestRide.offers[latestRide.offers.length - 1];
+
+        if (io) {
+          const payload = {
+            rideId: latestRide._id.toString(),
+            ride: populatedRide,
+            offer: createdOffer,
+            counterOffer: counterFare,
+            negotiationStatus: "countered",
+            captain: {
+              _id: demoCaptain._id.toString(),
+              name: demoCaptain.name || tpl.name,
+              phone: demoCaptain.phone || tpl.phone,
+              location: demoCaptain.location
+            }
+          };
+          io.to(`ride_${latestRide._id}`).emit("ride_counter_offer", payload);
+          io.to(`user_${latestRide.userId}`).emit("ride_counter_offer", payload);
+          io.to(`ride_${latestRide._id}`).emit("ride_updated", populatedRide);
+          io.to(`user_${latestRide.userId}`).emit("ride_updated", populatedRide);
+          io.emit("negotiationOfferSubmitted", {
+            rideId: latestRide._id,
+            offer: createdOffer
+          });
+        }
+      } catch (err) {
+        console.error("[DEMO COUNTER OFFER ERROR]:", err.message);
       }
-
-      const demoCaptain = await getOrCreateDemoCaptain(
-        latestRide.pickupLat,
-        latestRide.pickupLng
-      );
-
-      const baseOffer = Number(
-        latestRide.offeredFare || latestRide.estimatedFare || 35
-      );
-      const counterFare = Math.max(
-        Math.round(baseOffer * 1.18),
-        Math.round(baseOffer) + 1
-      );
-
-      const existingIdx = latestRide.offers.findIndex(
-        (offer) => offer.driverId.toString() === demoCaptain._id.toString()
-      );
-      if (existingIdx !== -1) {
-        latestRide.offers[existingIdx].offeredFare = counterFare;
-        latestRide.offers[existingIdx].status = "pending";
-        latestRide.offers[existingIdx].driverName =
-          demoCaptain.name || "Arun K. (Captain)";
-      } else {
-        latestRide.offers.push({
-          driverId: demoCaptain._id,
-          driverName: demoCaptain.name || "Arun K. (Captain)",
-          driverPhone: demoCaptain.phone || "+919876543211",
-          offeredFare: counterFare,
-          status: "pending"
-        });
-      }
-
-      latestRide.negotiationStatus = "countered";
-      latestRide.counterOffer = counterFare;
-      latestRide.driverId = demoCaptain._id;
-      await latestRide.save();
-
-      const populatedRide = await getPopulatedRide(latestRide._id);
-      const createdOffer =
-        latestRide.offers[latestRide.offers.length - 1];
-
-      if (io) {
-        const payload = {
-          rideId: latestRide._id.toString(),
-          ride: populatedRide,
-          offer: createdOffer,
-          counterOffer: counterFare,
-          negotiationStatus: "countered",
-          captain: {
-            _id: demoCaptain._id.toString(),
-            name: demoCaptain.name || "Arun K. (Captain)",
-            phone: demoCaptain.phone || "",
-            location: demoCaptain.location
-          }
-        };
-        io.to(`ride_${latestRide._id}`).emit("ride_counter_offer", payload);
-        io.to(`user_${latestRide.userId}`).emit("ride_counter_offer", payload);
-        io.to(`ride_${latestRide._id}`).emit("ride_updated", populatedRide);
-        io.to(`user_${latestRide.userId}`).emit("ride_updated", populatedRide);
-        io.emit("negotiationOfferSubmitted", {
-          rideId: latestRide._id,
-          offer: createdOffer
-        });
-      }
-    } catch (err) {
-      console.error("[DEMO COUNTER OFFER ERROR]:", err.message);
-    }
-  }, 2500);
+    }, (i + 1) * 1200);
+  }
 };
 
 const scheduleDemoNormalAccept = (rideId, io) => {
@@ -503,9 +559,7 @@ exports.requestRide = async (req, res) => {
     });
 
     const rawDemoMode = req.body.isDemoMode;
-    const isDemoMode =
-      rawDemoMode === true ||
-      (rawDemoMode !== false && requestedBookingMode === "negotiation");
+    const isDemoMode = rawDemoMode === true;
 
     let availableDrivers = await User.find({
       role: "driver",
@@ -578,7 +632,7 @@ exports.requestRide = async (req, res) => {
       io.emit("negotiationRideRequested", ride);
 
       if (isDemoMode) {
-        scheduleDemoCounterOffer(ride._id, io);
+        scheduleDemoCounterOffers(ride._id, io);
       }
 
       return res.status(201).json({

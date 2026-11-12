@@ -21,6 +21,14 @@ const rideOfferSchema = new mongoose.Schema(
       type: Number,
       required: true
     },
+    driverRating: {
+      type: Number,
+      default: 4.8
+    },
+    eta: {
+      type: String,
+      default: "3 min"
+    },
     status: {
       type: String,
       enum: ["pending", "selected", "rejected", "accepted_base"],

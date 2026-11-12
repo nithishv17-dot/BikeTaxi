@@ -1344,25 +1344,34 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     _demoMovementTimer = null;
   }
 
-  List<Map<String, dynamic>> _buildLocalFallbackCaptains(double baseLat, double baseLng) {
+  List<Map<String, dynamic>> _buildLocalFallbackCaptains(
+    double baseLat,
+    double baseLng, {
+    int count = 6,
+  }) {
     const names = [
       "Arun K. (Captain)",
       "Suresh R. (Captain)",
       "Karthik S. (Captain)",
       "Vignesh M. (Captain)",
       "Praveen V. (Captain)",
+      "Dinesh P. (Captain)",
+      "Vijay N. (Captain)",
+      "Manoj T. (Captain)",
+      "Rahul B. (Captain)",
+      "Deepak G. (Captain)",
     ];
     final cosLat = cos(baseLat * pi / 180.0).abs().clamp(0.2, 1.0);
-    return List.generate(5, (i) {
-      final radiusDeg = (0.5 + _demoRng.nextDouble()) / 111.0;
+    return List.generate(count, (i) {
+      final radiusDeg = (0.45 + _demoRng.nextDouble() * 1.1) / 111.0;
       final angle = _demoRng.nextDouble() * 2 * pi;
       final lat = baseLat + radiusDeg * cos(angle);
       final lng = baseLng + (radiusDeg * sin(angle)) / cosLat;
       final id = "mock_captain_${i + 1}";
       return {
         "_id": id,
-        "name": names[i],
-        "phone": "+91987654321${i + 1}",
+        "name": names[i % names.length],
+        "phone": "+91987654321$i",
         "role": "driver",
         "isAvailable": true,
         "isSimulated": true,
@@ -1393,13 +1402,14 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
 
     final targetLat = pickupLat ?? currentLat ?? AppConfig.defaultLat;
     final targetLng = pickupLng ?? currentLng ?? AppConfig.defaultLng;
+    final int randomCount = 6 + _demoRng.nextInt(5); // 6 to 10 random captains
 
     List<Map<String, dynamic>> spawnedDrivers = [];
     try {
       final response = await ApiService.post('/api/drivers/mock-nearby', {
         'lat': targetLat,
         'lng': targetLng,
-        'count': 5,
+        'count': randomCount,
       });
 
       if (!mounted || !_isDemoSimulatorOn) return;
@@ -1413,7 +1423,11 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
       }).toList();
     } catch (_) {
       if (!mounted || !_isDemoSimulatorOn) return;
-      spawnedDrivers = _buildLocalFallbackCaptains(targetLat, targetLng);
+      spawnedDrivers = _buildLocalFallbackCaptains(
+        targetLat,
+        targetLng,
+        count: randomCount,
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -1425,7 +1439,11 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     if (!mounted || !_isDemoSimulatorOn) return;
 
     if (spawnedDrivers.isEmpty) {
-      spawnedDrivers = _buildLocalFallbackCaptains(targetLat, targetLng);
+      spawnedDrivers = _buildLocalFallbackCaptains(
+        targetLat,
+        targetLng,
+        count: randomCount,
+      );
     }
 
     setState(() {

@@ -278,115 +278,78 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(22, 18, 22, 26),
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
+                constraints: const BoxConstraints(maxWidth: 440),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    RevealMotion(
-                      delay: const Duration(milliseconds: 40),
-                      beginOffset: const Offset(0, -0.1),
-                      child: ReflectiveBanner(
-                        colors: const [AppPalette.primary, Color(0xFF4F46E5)],
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: const [
-                                  Icon(
-                                    Icons.two_wheeler_rounded,
-                                    color: Colors.white,
-                                    size: 34,
-                                  ),
-                                  SizedBox(height: 14),
-                                  Text(
-                                    "DotTaxi",
-                                    style: TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                      letterSpacing: -0.3,
-                                    ),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    "Fast booking, live tracking, and seamless payment in one premium experience.",
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10, bottom: 14),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF4A261).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            const SizedBox(width: 16),
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.24),
-                                  width: 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.25),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(15),
-                                child: Image.asset(
-                                  "assets/icon/app_icon.jpg",
-                                  width: 72,
-                                  height: 72,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
+                            child: const Icon(
+                              Icons.two_wheeler_rounded,
+                              size: 20,
+                              color: Color(0xFFF4A261),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            "Dottaxi",
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 16),
                     RevealMotion(
-                      delay: const Duration(milliseconds: 140),
+                      delay: const Duration(milliseconds: 80),
                       child: ReflectionCard(
-                        padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
+                        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
                               "Welcome Back",
                               textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.headlineMedium
+                              style: Theme.of(context).textTheme.headlineSmall
                                   ?.copyWith(
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: -0.2,
                                   ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 4),
                             Text(
                               isDriver
-                                  ? "Sign in to accept rides, manage availability, and stay connected with passengers."
-                                  : "Sign in to request rides, monitor drivers, and manage every trip.",
+                                  ? "Sign in to accept rides and stay connected."
+                                  : "Sign in to request rides and track trips.",
                               textAlign: TextAlign.center,
                               style: const TextStyle(
+                                fontSize: 12.5,
                                 color: AppPalette.slate500,
                                 fontWeight: FontWeight.w600,
-                                height: 1.4,
+                                height: 1.3,
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 10),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 ChoiceChip(
                                   label: const Text("Rider"),
+                                  visualDensity: VisualDensity.compact,
                                   selected: !isDriver,
                                   onSelected: (selected) {
                                     setState(() {
@@ -394,9 +357,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                     });
                                   },
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 10),
                                 ChoiceChip(
                                   label: const Text("Driver"),
+                                  visualDensity: VisualDensity.compact,
                                   selected: isDriver,
                                   onSelected: (selected) {
                                     setState(() {
@@ -406,21 +370,31 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 22),
+                            const SizedBox(height: 12),
                             TextField(
                               controller: identifierController,
                               keyboardType: TextInputType.text,
                               decoration: const InputDecoration(
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(
+                                  vertical: 13,
+                                  horizontal: 16,
+                                ),
                                 labelText: "Name or Phone Number",
                                 hintText: "Enter name or phone number",
                                 prefixIcon: Icon(Icons.person_outline_rounded),
                               ),
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 10),
                             TextField(
                               controller: passwordController,
                               obscureText: obscurePassword,
                               decoration: InputDecoration(
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 13,
+                                  horizontal: 16,
+                                ),
                                 labelText: "Password",
                                 hintText: "Enter password",
                                 prefixIcon: const Icon(Icons.lock_rounded),
@@ -438,20 +412,24 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 12),
                             AnimatedContainer(
                               duration: const Duration(milliseconds: 250),
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(18),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppPalette.primary.withOpacity(isLoading ? 0.18 : 0.28),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
+                                    color: AppPalette.primary.withValues(alpha: isLoading ? 0.18 : 0.28),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 8),
                                   ),
                                 ],
                               ),
                               child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size(double.infinity, 46),
+                                  padding: const EdgeInsets.symmetric(vertical: 11),
+                                ),
                                 onPressed: isLoading ? null : loginUser,
                                 child: AnimatedSwitcher(
                                   duration: const Duration(milliseconds: 220),
@@ -472,45 +450,51 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 4),
                             TextButton(
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                              ),
                               onPressed: () {
                                 context.push('/register');
                               },
                               child: const Text("Create Account"),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 4),
                             Row(
                               children: [
-                                Expanded(child: Divider(color: AppPalette.slate300.withOpacity(0.5))),
+                                Expanded(child: Divider(color: AppPalette.slate300.withValues(alpha: 0.5))),
                                 const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 12),
+                                  padding: EdgeInsets.symmetric(horizontal: 10),
                                   child: Text(
                                     "OR",
                                     style: TextStyle(
                                       color: AppPalette.slate500,
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 12,
+                                      fontSize: 11,
                                     ),
                                   ),
                                 ),
-                                Expanded(child: Divider(color: AppPalette.slate300.withOpacity(0.5))),
+                                Expanded(child: Divider(color: AppPalette.slate300.withValues(alpha: 0.5))),
                               ],
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 8),
                             OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(double.infinity, 54),
-                                side: BorderSide(color: AppPalette.slate300.withOpacity(0.7)),
+                                minimumSize: const Size(double.infinity, 46),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                side: BorderSide(color: AppPalette.slate300.withValues(alpha: 0.7)),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
                               onPressed: (isLoading || isGuestLoading || isGoogleLoading) ? null : loginAsGuest,
                               icon: isGuestLoading
                                   ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
+                                      width: 18,
+                                      height: 18,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2.2,
                                         color: AppPalette.primary,
@@ -519,7 +503,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   : const Icon(
                                       Icons.person_outline_rounded,
                                       color: AppPalette.primary,
-                                      size: 22,
+                                      size: 20,
                                     ),
                               label: Text(
                                 isGuestLoading
@@ -528,24 +512,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                 style: const TextStyle(
                                   color: AppPalette.slate900,
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 15,
+                                  fontSize: 14,
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(double.infinity, 54),
-                                side: BorderSide(color: AppPalette.slate300.withOpacity(0.7)),
+                                minimumSize: const Size(double.infinity, 46),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                side: BorderSide(color: AppPalette.slate300.withValues(alpha: 0.7)),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
                               onPressed: (isLoading || isGuestLoading || isGoogleLoading) ? null : loginWithGoogle,
                               icon: isGoogleLoading
                                   ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
+                                      width: 18,
+                                      height: 18,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2.2,
                                         color: AppPalette.primary,
@@ -553,11 +538,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                     )
                                   : Image.network(
                                       "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/512px-Google_%22G%22_Logo.svg.png",
-                                      height: 22,
+                                      height: 20,
                                       errorBuilder: (context, error, stackTrace) => const Icon(
                                         Icons.account_circle_rounded,
                                         color: AppPalette.primary,
-                                        size: 22,
+                                        size: 20,
                                       ),
                                     ),
                               label: Text(
@@ -565,7 +550,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 style: const TextStyle(
                                   color: AppPalette.slate900,
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 15,
+                                  fontSize: 14,
                                 ),
                               ),
                             ),
@@ -574,23 +559,21 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: result.isEmpty
                                   ? const SizedBox.shrink()
                                   : Padding(
-                                      padding: const EdgeInsets.only(top: 10),
+                                      padding: const EdgeInsets.only(top: 8),
                                       child: Container(
-                                        padding: const EdgeInsets.all(14),
+                                        padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF93000A).withOpacity(0.15),
-                                          borderRadius: BorderRadius.circular(
-                                            16,
-                                          ),
+                                          color: const Color(0xFF93000A).withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(14),
                                           border: Border.all(
-                                            color: const Color(0xFFFFB4AB).withOpacity(0.3),
+                                            color: const Color(0xFFFFB4AB).withValues(alpha: 0.3),
                                           ),
                                         ),
                                         child: Text(
                                           result,
                                           textAlign: TextAlign.center,
                                           style: const TextStyle(
-                                            fontSize: 14,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.w600,
                                             color: Color(0xFFFFB4AB),
                                           ),

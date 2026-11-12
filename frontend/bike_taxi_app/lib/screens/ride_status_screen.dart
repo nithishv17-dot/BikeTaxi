@@ -1358,29 +1358,39 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     }
   }
 
-  Future<void> _declineOffer(String offerId) async {
-    setState(() {
-      actionLoading = true;
-    });
+  Future<void> _acceptCounterOffer(Map<String, dynamic> offer) async {
+    final offerId = _normalizeOfferId(offer["_id"]) ?? "";
+    await confirmOffer(offerId);
+  }
 
-    try {
-      await ApiService.rejectFare(widget.rideId);
-    } catch (_) {
-      // Allow graceful UI decline even if network hiccups in demo mode
+  Future<void> _declineOffer(String offerId) async {
+    final remainingCount = offers
+        .where((o) =>
+            _normalizeOfferId(o["_id"]) != offerId &&
+            o["status"]?.toString() != "rejected")
+        .length;
+
+    if (remainingCount == 0) {
+      setState(() {
+        actionLoading = true;
+      });
+      try {
+        await ApiService.rejectFare(widget.rideId);
+      } catch (_) {}
     }
 
     if (!mounted) return;
     setState(() {
       actionLoading = false;
       offers.removeWhere((o) => _normalizeOfferId(o["_id"]) == offerId);
-      if (ride != null) {
+      if (ride != null && remainingCount == 0) {
         final nextRide = Map<String, dynamic>.from(ride!);
         nextRide["negotiationStatus"] = "rejected";
         nextRide["counterOffer"] = 0;
         ride = nextRide;
       }
     });
-    _showSnack("Counter offer declined");
+    _showSnack("Offer declined");
   }
 
   String? _rideUserId() {
@@ -2149,189 +2159,21 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                       final offerId = _normalizeOfferId(offer["_id"]) ?? "";
                       final driverName =
                           offer["driverName"]?.toString() ?? "Arun K. (Captain)";
-                      final wholeFare =
-                          (_toDouble(offer["offeredFare"]) ?? 0).round().toString();
+                      final formattedFare = _formatFareToInt(offer["offeredFare"]);
                       final rating =
                           (offer["driverRating"] ?? offer["rating"])?.toString() ??
                               "4.8";
                       final eta = offer["eta"]?.toString() ?? "~3 min";
-                      final initials = driverName.isNotEmpty
-                          ? driverName
-                              .trim()
-                              .split(" ")
-                              .where((w) => w.isNotEmpty)
-                              .map((w) => w[0])
-                              .take(2)
-                              .join()
-                          : "C";
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF141820).withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: const Color(0xFFF59E0B).withValues(alpha: 0.45),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                "Captain Counter Offer: ₹$wholeFare",
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFFB45309),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: AppPalette.primary.withValues(alpha: 0.18),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: AppPalette.primary.withValues(alpha: 0.35),
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      initials.toUpperCase(),
-                                      style: const TextStyle(
-                                        color: AppPalette.primary,
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 17,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        driverName,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 15,
-                                          color: AppPalette.slate900,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.star_rounded,
-                                            color: Color(0xFFF59E0B),
-                                            size: 14,
-                                          ),
-                                          const SizedBox(width: 3),
-                                          Text(
-                                            rating,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 13,
-                                              color: AppPalette.slate700,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          const Icon(
-                                            Icons.access_time_rounded,
-                                            color: AppPalette.slate700,
-                                            size: 13,
-                                          ),
-                                          const SizedBox(width: 3),
-                                          Text(
-                                            eta,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 13,
-                                              color: AppPalette.slate700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Text(
-                                  "₹$wholeFare",
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppPalette.slate900,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      foregroundColor: Colors.redAccent,
-                                      side: const BorderSide(
-                                        color: Colors.redAccent,
-                                        width: 1.2,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    onPressed: actionLoading
-                                        ? null
-                                        : () => _declineOffer(offerId),
-                                    child: const Text(
-                                      "Decline",
-                                      style: TextStyle(fontWeight: FontWeight.w700),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  flex: 2,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      backgroundColor: const Color(0xFF10B981),
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      elevation: 0,
-                                    ),
-                                    onPressed: actionLoading
-                                        ? null
-                                        : () => confirmOffer(offerId),
-                                    child: Text(
-                                      "Accept ₹$wholeFare",
-                                      style: const TextStyle(fontWeight: FontWeight.w800),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                      return _SlideToAcceptOfferCard(
+                        key: ValueKey(offerId.isNotEmpty ? offerId : "$driverName-$formattedFare"),
+                        driverName: driverName,
+                        formattedFare: formattedFare,
+                        rating: rating,
+                        eta: eta,
+                        isDisabled: actionLoading,
+                        onAccept: () => _acceptCounterOffer(offer),
+                        onDecline: () => _declineOffer(offerId),
                       );
                     }).toList(),
                   );
@@ -3459,4 +3301,358 @@ class _HeadingConePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SlideToAcceptOfferCard extends StatefulWidget {
+  final String driverName;
+  final String formattedFare;
+  final String rating;
+  final String eta;
+  final bool isDisabled;
+  final Future<void> Function() onAccept;
+  final VoidCallback onDecline;
+
+  const _SlideToAcceptOfferCard({
+    super.key,
+    required this.driverName,
+    required this.formattedFare,
+    required this.rating,
+    required this.eta,
+    required this.isDisabled,
+    required this.onAccept,
+    required this.onDecline,
+  });
+
+  @override
+  State<_SlideToAcceptOfferCard> createState() => _SlideToAcceptOfferCardState();
+}
+
+class _SlideToAcceptOfferCardState extends State<_SlideToAcceptOfferCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _chevronController;
+  double _dragX = 0.0;
+  bool _acceptedTriggered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _chevronController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _chevronController.dispose();
+    super.dispose();
+  }
+
+  String _initialsFor(String name) {
+    final parts = name.trim().split(" ").where((w) => w.isNotEmpty).toList();
+    if (parts.isEmpty) return "C";
+    return parts.map((w) => w[0]).take(2).join().toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = _initialsFor(widget.driverName);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double cardWidth = constraints.maxWidth;
+        const double avatarSize = 48.0;
+        const double horizontalPadding = 14.0;
+        final double maxDrag =
+            (cardWidth - avatarSize - horizontalPadding * 2).clamp(40.0, cardWidth);
+        final double acceptThreshold = (cardWidth * 0.68).clamp(40.0, maxDrag);
+        final double progress = (_dragX / maxDrag).clamp(0.0, 1.0);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragUpdate: (widget.isDisabled || _acceptedTriggered)
+                  ? null
+                  : (details) {
+                      setState(() {
+                        _dragX = (_dragX + details.delta.dx).clamp(0.0, maxDrag);
+                      });
+                    },
+              onHorizontalDragEnd: (widget.isDisabled || _acceptedTriggered)
+                  ? null
+                  : (_) async {
+                      if (_dragX >= acceptThreshold) {
+                        setState(() {
+                          _acceptedTriggered = true;
+                          _dragX = maxDrag;
+                        });
+                        HapticFeedback.mediumImpact();
+                        await widget.onAccept();
+                        if (mounted) {
+                          setState(() {
+                            _acceptedTriggered = false;
+                            _dragX = 0.0;
+                          });
+                        }
+                      } else {
+                        setState(() {
+                          _dragX = 0.0;
+                        });
+                      }
+                    },
+              onHorizontalDragCancel: () {
+                if (!_acceptedTriggered) {
+                  setState(() {
+                    _dragX = 0.0;
+                  });
+                }
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF141820),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: _dragX >= acceptThreshold
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF10B981).withValues(alpha: 0.35),
+                    width: 1.2,
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    // Low-transparency translucent green overlay across the card
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                const Color(0xFF10B981).withValues(alpha: 0.16),
+                                const Color(0xFF10B981).withValues(alpha: 0.14),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Dynamic progressive drag sweep
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: (_dragX + avatarSize + horizontalPadding)
+                          .clamp(0.0, cardWidth),
+                      child: IgnorePointer(
+                        child: Container(
+                          color: const Color(0xFF10B981)
+                              .withValues(alpha: 0.12 + (progress * 0.18)),
+                        ),
+                      ),
+                    ),
+                    // Animated right-moving chevron arrows (>>>)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: AnimatedBuilder(
+                          animation: _chevronController,
+                          builder: (context, _) {
+                            final t = _chevronController.value;
+                            return Align(
+                              alignment: Alignment.center,
+                              child: Transform.translate(
+                                offset: Offset((t * 28.0) - 14.0, 14.0),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: List.generate(3, (i) {
+                                    final phase = (t - i * 0.22) % 1.0;
+                                    final opacity = (0.20 +
+                                            0.55 *
+                                                (1.0 - (phase - 0.5).abs() * 2.0)
+                                                    .clamp(0.0, 1.0))
+                                        .clamp(0.15, 0.75);
+                                    return Icon(
+                                      Icons.chevron_right_rounded,
+                                      size: 20,
+                                      color: const Color(0xFF10B981)
+                                          .withValues(alpha: opacity),
+                                    );
+                                  }),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    // Foreground crisp captain info + decline X
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: horizontalPadding,
+                        vertical: 14,
+                      ),
+                      child: Row(
+                        children: [
+                          const SizedBox(width: avatarSize),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Opacity(
+                              opacity: (1.0 - progress * 0.65).clamp(0.25, 1.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.driverName,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.star_rounded,
+                                        color: Color(0xFFF59E0B),
+                                        size: 14,
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        widget.rating,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 12.5,
+                                          color: AppPalette.slate700,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      const Icon(
+                                        Icons.access_time_rounded,
+                                        color: AppPalette.slate700,
+                                        size: 13,
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        widget.eta,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12.5,
+                                          color: AppPalette.slate700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _dragX >= acceptThreshold
+                                        ? "Release to accept"
+                                        : "Slide avatar right to accept",
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF34D399)
+                                          .withValues(alpha: 0.9),
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "₹ ${widget.formattedFare}",
+                            style: const TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Material(
+                            color: Colors.white.withValues(alpha: 0.08),
+                            shape: const CircleBorder(),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: (widget.isDisabled || _acceptedTriggered)
+                                  ? null
+                                  : widget.onDecline,
+                              child: const Padding(
+                                padding: EdgeInsets.all(6),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  size: 16,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Draggable captain initials avatar handle sliding smoothly on top
+                    Positioned(
+                      left: horizontalPadding + _dragX,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: Container(
+                          width: avatarSize,
+                          height: avatarSize,
+                          decoration: BoxDecoration(
+                            color: _dragX >= acceptThreshold
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF1E293B),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFF10B981),
+                              width: 2.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF10B981)
+                                    .withValues(alpha: 0.35),
+                                blurRadius: 10,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: _acceptedTriggered
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(
+                                    initials,
+                                    style: TextStyle(
+                                      color: _dragX >= acceptThreshold
+                                          ? Colors.white
+                                          : const Color(0xFF10B981),
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
