@@ -1462,28 +1462,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> with TickerProvid
     });
 
     _startDemoMovementTimer();
-
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.two_wheeler, color: Color(0xFFF59E0B), size: 20),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                "Demo Mode ON: Live Captains & Auto-Negotiation Active",
-                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF141820),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
   }
 
   Widget _buildDemoSimulatorToggle() {
